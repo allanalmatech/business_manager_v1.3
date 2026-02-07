@@ -1,0 +1,135 @@
+/* Dark Midnight */
+[data-theme="dark"]{
+  --primary-color: #375a7f;
+  --primary-hover: #2f4f70;
+
+  --app-bg: #1a1a1a;
+  --card-bg: #2d2d2d;
+  --topbar-bg: #222222;
+
+  --text-color: #eaeaea;
+  --muted-color: #bdbdbd;
+
+  --sidebar-bg: #222222;
+  --sidebar-color: #e0e0e0;
+  --sidebar-active-bg: rgba(55, 90, 127, 0.2);
+  --sidebar-active-color: #eaeaea;
+
+  --border-color: rgba(255,255,255,0.12);
+}
+
+
+/* Ocean Breeze */
+[data-theme="ocean"] {
+  --primary-color: #0077b6;
+  --app-bg: #e0f2f1;
+  --sidebar-bg: #0077b6;
+  --sidebar-color: #ffffff;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.2);
+  --sidebar-active-color: #ffffff;
+  --topbar-bg: #ffffff;
+  --card-bg: #ffffff;
+}
+
+/* Forest Green */
+[data-theme="forest"] {
+  --primary-color: #2d6a4f;
+  --app-bg: #f1f8e9;
+  --sidebar-bg: #1b4332;
+  --sidebar-color: #ffffff;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.15);
+  --sidebar-active-color: #ffffff;
+  --topbar-bg: #ffffff;
+  --card-bg: #ffffff;
+}
+
+/* Sunset Orange */
+[data-theme="sunset"] {
+  --primary-color: #e67e22;
+  --app-bg: #fff5e6;
+  --sidebar-bg: #ffffff;
+  --sidebar-color: #4a4a4a;
+  --sidebar-active-bg: rgba(230, 126, 34, 0.1);
+  --sidebar-active-color: #e67e22;
+  --topbar-bg: #ffffff;
+  --card-bg: #ffffff;
+}
+
+/* Royal Purple */
+[data-theme="royal"] {
+  --primary-color: #6f42c1;
+  --app-bg: #f3f0f9;
+  --sidebar-bg: #4b2c82;
+  --sidebar-color: #ffffff;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.2);
+  --sidebar-active-color: #ffffff;
+  --topbar-bg: #ffffff;
+  --card-bg: #ffffff;
+}
+
+/* Minimal Slate */
+[data-theme="slate"] {
+  --primary-color: #475569;
+  --app-bg: #f8fafc;
+  --sidebar-bg: #1e293b;
+  --sidebar-color: #f1f5f9;
+  --sidebar-active-bg: #334155;
+  --sidebar-active-color: #ffffff;
+  --topbar-bg: #ffffff;
+  --card-bg: #ffffff;
+}
+
+/* Rose Garden */
+[data-theme="rose"] {
+  --primary-color: #d81b60;
+  --app-bg: #fff1f2;
+  --sidebar-bg: #ffffff;
+  --sidebar-color: #4c0519;
+  --sidebar-active-bg: #ffe4e6;
+  --sidebar-active-color: #d81b60;
+  --topbar-bg: #ffffff;
+  --card-bg: #ffffff;
+}
+
+/* Coffee Shop */
+[data-theme="coffee"] {
+  --primary-color: #795548;
+  --app-bg: #efebe9;
+  --sidebar-bg: #3e2723;
+  --sidebar-color: #d7ccc8;
+  --sidebar-active-bg: #5d4037;
+  --sidebar-active-color: #ffffff;
+  --topbar-bg: #ffffff;
+  --card-bg: #ffffff;
+}
+
+/* Cyberpunk (Neon) */
+[data-theme="cyber"]{
+  --primary-color: #00ff41;
+  --primary-hover: #00d936;
+
+  --app-bg: #0d0208;
+  --card-bg: #141018;
+  --topbar-bg: #0d0208;
+
+  --text-color: #e8ffe9;
+  --muted-color: #9cffb0;
+
+  --sidebar-bg: #000000;
+  --sidebar-color: #00ff41;
+  --sidebar-active-bg: rgba(0, 255, 65, 0.12);
+  --sidebar-active-color: #e8ffe9;
+
+  --border-color: rgba(0,255,65,0.55);
+}
+[data-theme="ocean"],
+[data-theme="forest"],
+[data-theme="sunset"],
+[data-theme="royal"],
+[data-theme="slate"],
+[data-theme="rose"],
+[data-theme="coffee"]{
+  --text-color: #111827;
+  --muted-color: #6b7280;
+  --primary-hover: color-mix(in srgb, var(--primary-color) 85%, #000);
+}
