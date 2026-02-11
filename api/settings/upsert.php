@@ -28,16 +28,48 @@ if (empty($_SESSION['csrf']) || !hash_equals((string)$_SESSION['csrf'], $csrf)) 
 
 $key = trim((string)($_POST['key'] ?? ''));
 $val = (string)($_POST['value'] ?? '');
+$group = trim((string)($_POST['group'] ?? 'General'));
+$type = trim((string)($_POST['type'] ?? 'text'));
+$desc = trim((string)($_POST['description'] ?? ''));
+$sort = (int)($_POST['sort_order'] ?? 0);
 
 if ($key === '') out(['success'=>false,'message'=>'Key is required'], 422);
 
-$sql = "INSERT INTO settings (`key`,`value`) VALUES (?,?)
-        ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), updated_at=CURRENT_TIMESTAMP";
+// Check if table supports additional columns
+$cols = [];
+$rsCols = $db->query("SHOW COLUMNS FROM settings");
+if ($rsCols) {
+  while ($c = $rsCols->fetch_assoc()) $cols[] = $c['Field'];
+}
 
-$stmt = $db->prepare($sql);
-if (!$stmt) out(['success'=>false,'message'=>'Prepare failed: '.$db->error], 500);
+$hasGrouping = in_array('group', $cols, true);
+$hasType = in_array('type', $cols, true);
+$hasDescription = in_array('description', $cols, true);
+$hasSortOrder = in_array('sort_order', $cols, true);
 
-$stmt->bind_param("ss", $key, $val);
+// Build query based on available columns
+if ($hasGrouping && $hasType && $hasDescription && $hasSortOrder) {
+  // Full featured table
+  $sql = "INSERT INTO settings (`key`,`value`,`group`,`type`,`description`,`sort_order`) VALUES (?,?,?,?,?,?)
+          ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), `group`=VALUES(`group`), 
+          `type`=VALUES(`type`), `description`=VALUES(`description`), 
+          `sort_order`=VALUES(`sort_order`), updated_at=CURRENT_TIMESTAMP";
+  
+  $stmt = $db->prepare($sql);
+  if (!$stmt) out(['success'=>false,'message'=>'Prepare failed: '.$db->error], 500);
+  
+  $stmt->bind_param("sssssi", $key, $val, $group, $type, $desc, $sort);
+} else {
+  // Basic table - just key/value
+  $sql = "INSERT INTO settings (`key`,`value`) VALUES (?,?)
+          ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), updated_at=CURRENT_TIMESTAMP";
+  
+  $stmt = $db->prepare($sql);
+  if (!$stmt) out(['success'=>false,'message'=>'Prepare failed: '.$db->error], 500);
+  
+  $stmt->bind_param("ss", $key, $val);
+}
+
 $ok = $stmt->execute();
 $err = $stmt->error;
 $stmt->close();

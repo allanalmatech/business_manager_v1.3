@@ -50,6 +50,35 @@ function format_stock(array $p): string
     return (string)((int)round($qty)) . " pieces";
 }
 
+/**
+ * Generate CSRF token
+ * @return string CSRF token
+ */
+function generate_csrf_token(): string {
+    if (!isset($_SESSION)) {
+        session_start();
+    }
+    
+    if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Verify CSRF token
+ * @param string $token Token to verify
+ * @return bool True if token is valid
+ */
+function verify_csrf_token(string $token): bool {
+    if (!isset($_SESSION)) {
+        session_start();
+    }
+    
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+}
+
 function parse_sale_qty(string $input): float
 {
     // allow decimals for units (kg), and integers for pieces-based

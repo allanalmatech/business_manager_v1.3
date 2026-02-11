@@ -329,7 +329,7 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
                   </div>
                   
                   <p class="small-text">This is disabled for now</p>
-                  <button type="submit" class="btn btn-warning">
+                  <button type="submit" class="btn btn-warning" disabled="true">
                     <i class="bi bi-shield-check me-1"></i> Change Password
                   </button>
                 </form>
