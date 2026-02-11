@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/rbac.php';
 require_once __DIR__ . '/../../includes/helpers.php';
 
-require_permission('reports.view');
+require_permission('reports.b2b.view');
 
 if (function_exists('audit_log')) {
     audit_log('reports.b2b.view', 'reports', null, "B2B report accessed");

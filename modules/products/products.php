@@ -1133,7 +1133,7 @@ async function openNew(){
   // Set a temporary ID for new products (will be replaced after save)
   currentProductId = 'new_' + Date.now();
   
-  productModal.show();
+  mdl.show();
 }
 
 async function openEdit(id){

@@ -20,9 +20,6 @@ if (!$db instanceof mysqli) {
   die("DB not available");
 }
 
-function has_perm(string $p): bool {
-  return function_exists('user_has_permission') ? (bool) user_has_permission($p) : true;
-}
 
 // CSRF
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -60,11 +57,11 @@ if ($cq) {
 }
 
 // Permissions
-$can_discount  = has_perm('pos.apply_discount');
-$can_editprice = has_perm('pos.edit_price');
-$can_invoice   = has_perm('pos.invoice');
-$can_dn        = has_perm('pos.delivery_note');
-$can_debt      = has_perm('pos.allow_debt');
+$can_discount  = user_has_permission('pos.apply_discount');
+$can_editprice = user_has_permission('pos.edit_price');
+$can_invoice   = user_has_permission('pos.invoice');
+$can_dn        = user_has_permission('pos.delivery_note');
+$can_debt      = user_has_permission('pos.allow_debt');
 
 require_once __DIR__ . '/../../templates/layout/header.php';
 ?>
@@ -86,10 +83,65 @@ require_once __DIR__ . '/../../templates/layout/header.php';
 
     <div class="pos-topbar">
       <div class="pos-tabs-modern" id="posCategories">
-        <button type="button" class="pos-tab-modern active" data-cat="">All</button>
-        <button type="button" class="pos-tab-modern" data-cat="popular">Popular</button>
-        <button type="button" class="pos-tab-modern" data-cat="fashion">Fashion</button>
-        <button type="button" class="pos-tab-modern" data-cat="food">Food</button>
+        <button type="button" class="pos-tab-modern active" data-cat="">
+          <i class="bi bi-grid-3x3-gap"></i> All
+        </button>
+        <button type="button" class="pos-tab-modern" data-cat="popular">
+          <i class="bi bi-star"></i> Popular
+        </button>
+        <?php
+        // Load categories from database
+        $categories_query = $db->query("SELECT id, name FROM product_categories WHERE is_active=1 ORDER BY name ASC LIMIT 8");
+        if ($categories_query && $categories_query->num_rows > 0):
+          while ($category = $categories_query->fetch_assoc()):
+            // Get appropriate icon based on category name
+            $icon = 'bi-box'; // default icon
+            $categoryName = strtolower($category['name']);
+            
+            // Map category names to appropriate Bootstrap Icons
+            if (strpos($categoryName, 'food') !== false || strpos($categoryName, 'drink') !== false || strpos($categoryName, 'beverage') !== false) {
+              $icon = 'bi-cup-hot';
+            } elseif (strpos($categoryName, 'cloth') !== false || strpos($categoryName, 'fashion') !== false || strpos($categoryName, 'wear') !== false) {
+              $icon = 'bi-bag';
+            } elseif (strpos($categoryName, 'electronic') !== false || strpos($categoryName, 'tech') !== false || strpos($categoryName, 'gadget') !== false) {
+              $icon = 'bi-cpu';
+            } elseif (strpos($categoryName, 'phone') !== false || strpos($categoryName, 'mobile') !== false) {
+              $icon = 'bi-phone';
+            } elseif (strpos($categoryName, 'book') !== false || strpos($categoryName, 'paper') !== false) {
+              $icon = 'bi-book';
+            } elseif (strpos($categoryName, 'home') !== false || strpos($categoryName, 'furniture') !== false) {
+              $icon = 'bi-house';
+            } elseif (strpos($categoryName, 'toy') !== false || strpos($categoryName, 'game') !== false) {
+              $icon = 'bi-controller';
+            } elseif (strpos($categoryName, 'health') !== false || strpos($categoryName, 'medicine') !== false) {
+              $icon = 'bi-heart-pulse';
+            } elseif (strpos($categoryName, 'sport') !== false || strpos($categoryName, 'fitness') !== false) {
+              $icon = 'bi-trophy';
+            } elseif (strpos($categoryName, 'beauty') !== false || strpos($categoryName, 'cosmetic') !== false) {
+              $icon = 'bi-star';
+            } elseif (strpos($categoryName, 'clean') !== false || strpos($categoryName, 'detergent') !== false) {
+              $icon = 'bi-droplet';
+            } elseif (strpos($categoryName, 'car') !== false || strpos($categoryName, 'auto') !== false) {
+              $icon = 'bi-car-front';
+            } elseif (strpos($categoryName, 'tool') !== false || strpos($categoryName, 'hardware') !== false) {
+              $icon = 'bi-wrench';
+            }
+            
+            // Check if category name is short enough for icon + text, otherwise use angle brackets
+            $categoryLength = strlen($category['name']);
+            $useAngleBrackets = $categoryLength > 8; // Use brackets for longer names
+        ?>
+          <button type="button" class="pos-tab-modern" data-cat="<?= htmlspecialchars($category['id']) ?>">
+            <?php if ($useAngleBrackets): ?>
+              <<?= htmlspecialchars($icon) ?>> <?= htmlspecialchars($category['name']) ?>
+            <?php else: ?>
+              <i class="bi <?= htmlspecialchars($icon) ?>"></i> <?= htmlspecialchars($category['name']) ?>
+            <?php endif; ?>
+          </button>
+        <?php 
+          endwhile; 
+        endif; 
+        ?>
       </div>
 
       <div class="pos-search">
@@ -222,10 +274,10 @@ require_once __DIR__ . '/../../templates/layout/header.php';
 
         <div class="payment-shortcuts">
           <button type="button" class="btn btn-outline-secondary btn-shortcut" data-amt="exact">EXACT</button>
-          <button type="button" class="btn btn-outline-secondary btn-shortcut" data-amt="10">+10</button>
-          <button type="button" class="btn btn-outline-secondary btn-shortcut" data-amt="50">+50</button>
           <button type="button" class="btn btn-outline-secondary btn-shortcut" data-amt="100">+100</button>
           <button type="button" class="btn btn-outline-secondary btn-shortcut" data-amt="500">+500</button>
+          <button type="button" class="btn btn-outline-secondary btn-shortcut" data-amt="5000">+5,000</button>
+          <button type="button" class="btn btn-outline-secondary btn-shortcut" data-amt="50000">+50,000</button>
           <button type="button" class="btn btn-primary btn-shortcut" id="btnAddPaymentRow">ADD</button>
         </div>
 
@@ -430,8 +482,6 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('b2b_unit_type').addEventListener('change', toggleUnitName);
       
       document.getElementById('btnAddB2BLine').addEventListener('click', ()=>{
-        console.log('B2B Add button clicked'); // Debug line
-        
         const name = document.getElementById('b2b_name').value.trim();
         const sku = document.getElementById('b2b_sku').value.trim() || null;
         const qty = Number(document.getElementById('b2b_qty').value || 0);
@@ -446,8 +496,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const supplier_name = document.getElementById('b2b_supplier_text').value.trim() || null;
         const note = document.getElementById('b2b_note').value.trim() || null;
-
-        console.log('B2B Data:', {name, sku, qty, cost, sell, currency, rate, supplier_name}); // Debug line
 
         // validation
         if(!name){ return setB2BMsg('Item name is required.', true); }
@@ -472,9 +520,6 @@ document.addEventListener('DOMContentLoaded', function() {
           note
         };
 
-        console.log('B2B Line object:', line); // Debug line
-        console.log('Current B2B lines before push:', window.b2bLines); // Debug line
-
         // Add to main cart using global addToCart function
         if (typeof window.addToCart === 'function') {
           window.addToCart({
@@ -486,10 +531,9 @@ document.addEventListener('DOMContentLoaded', function() {
             unit_price: line.sell_price,
             b2b_data: line
           });
-          console.log('B2B item added to cart successfully'); // Debug line
+          //console.log('B2B item added to cart successfully'); // Debug line
         } else {
           // Fallback if addToCart not available
-          console.error('window.addToCart function not found, using fallback');
           window.b2bLines = window.b2bLines || [];
           window.b2bLines.push(line);
           renderB2BLines();
@@ -504,8 +548,6 @@ function renderB2BLines(){
   // Fallback rendering for B2B items if addToCart is not available
   if (!window.b2bLines || window.b2bLines.length === 0) return;
   
-  console.log('Rendering B2B lines as fallback:', window.b2bLines);
-  
   // Use the new POS_CART API if available
   if (window.POS_CART && typeof window.POS_CART.add === 'function') {
     window.b2bLines.forEach(function(b2bItem) {
@@ -519,16 +561,15 @@ function renderB2BLines(){
         b2b_data: b2bItem
       });
     });
-    console.log('B2B items added via POS_CART API');
+  //  console.log('B2B items added via POS_CART API');
   } else {
     // Fallback to direct cart manipulation
-    console.warn('POS_CART API not available, using fallback');
+   // console.warn('POS_CART API not available, using fallback');
     window.b2bLines.forEach(function(b2bItem) {
       // Create a mock addToCart call
       if (typeof window.posCart === 'undefined') {
         window.posCart = window.posCart || [];
       }
-      
       // Check if item already exists
       const existingIndex = window.posCart.findIndex(item => 
         item.is_b2b && item.tmp_id === b2bItem.tmp_id

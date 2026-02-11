@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/rbac.php';
 require_once __DIR__ . '/../../includes/helpers.php';
 
-require_permission('sales.view');
+require_permission('reports.sales.view');
 
 $db = $GLOBALS['db'];
 

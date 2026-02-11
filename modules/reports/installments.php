@@ -7,8 +7,8 @@ require_once dirname(dirname(__DIR__)) . '/includes/auth.php';
 require_once dirname(dirname(__DIR__)) . '/includes/helpers.php';
 require_once dirname(dirname(__DIR__)) . '/includes/rbac.php';
 
-if (function_exists('require_admin_login')) require_admin_login();
-require_permission('reports.view');
+//if (function_exists('require_admin_login')) require_admin_login();
+require_permission('reports.installments.view');
 
 $db = $GLOBALS['db'] ?? null;
 function table_exists(mysqli $db, string $table): bool {

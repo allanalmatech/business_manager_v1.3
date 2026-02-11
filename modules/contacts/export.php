@@ -23,7 +23,7 @@ if ($user_id <= 0) {
     exit;
 }
 
-require_permission('contacts.view');
+require_permission('contacts.update');
 
 $page_title = 'Export Contacts';
 include __DIR__ . '/../../templates/layout/header.php';

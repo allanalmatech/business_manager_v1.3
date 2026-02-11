@@ -2,7 +2,14 @@
 // templates/layout/sidebar.php
 $BASE_URL = $GLOBALS['BASE_URL'] ?? '';
 
-function show_menu(string $key): bool { return true; } // replace later with RBAC
+// Check if user has specific permission
+function has_permission(string $perm): bool {
+  // Check if function exists and user has permission
+  if (function_exists('user_has_permission')) {
+    return user_has_permission($perm);
+  }
+  return false;
+}
 
 // Helper to render a group as collapsible if >2 items
 function sidebar_group(string $id, string $icon, string $title, array $items, string $baseUrl): void {
@@ -53,16 +60,19 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
       <i class="bi bi-speedometer2"></i> <span class="nav-text">Dashboard</span>
     </a>
 
-    <?php if (show_menu('sales')): ?>
-      <?php sidebar_group('sales','<i class="bi bi-cart3"></i>','Sales',[
-        ['href'=>'/modules/pos/pos.php','label'=>'POS (New Sale)','icon'=>'<i class="bi bi-printer"></i>'],
-        ['href'=>'/modules/pos/sales_history.php','label'=>'Sales History','icon'=>'<i class="bi bi-clock-history"></i>'],
-        ['href'=>'/modules/pos/unpaid.php','label'=>'Unpaid / Pending','icon'=>'<i class="bi bi-hourglass-split"></i>'],
-        ['href'=>'/modules/pos/returns.php','label'=>'Returns','icon'=>'<i class="bi bi-arrow-return-left"></i>'],
-      ], $BASE_URL); ?>
+    <?php if (has_permission('pos.create') || has_permission('pos.use') || has_permission('pos.view')): ?>
+      <?php 
+      $salesItems = [];
+      if (has_permission('pos.create')) $salesItems[] = ['href'=>'/modules/pos/pos.php','label'=>'POS (New Sale)','icon'=>'<i class="bi bi-printer"></i>'];
+      if (has_permission('pos.view')) $salesItems[] = ['href'=>'/modules/pos/sales_history.php','label'=>'Sales History','icon'=>'<i class="bi bi-clock-history"></i>'];
+      if (has_permission('pos.view')) $salesItems[] = ['href'=>'/modules/pos/unpaid.php','label'=>'Unpaid / Pending','icon'=>'<i class="bi bi-hourglass-split"></i>'];
+      if (has_permission('pos.void')) $salesItems[] = ['href'=>'/modules/pos/returns.php','label'=>'Returns','icon'=>'<i class="bi bi-arrow-return-left"></i>'];
+      
+      sidebar_group('sales','<i class="bi bi-cart3"></i>','Sales', $salesItems, $BASE_URL); 
+      ?>
     <?php endif; ?>
 
-    <?php if (show_menu('documents')): ?>
+    <?php if (has_permission('documents.view')): ?>
       <?php sidebar_group('documents','<i class="bi bi-file-earmark-text"></i>','Documents',[
         ['href'=>'/modules/documents/receipts.php','label'=>'Receipts','icon'=>'<i class="bi bi-receipt"></i>'],
         ['href'=>'/modules/documents/invoices.php','label'=>'Invoices','icon'=>'<i class="bi bi-file-earmark-spreadsheet"></i>'],
@@ -71,7 +81,7 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
       ], $BASE_URL); ?>
     <?php endif; ?>
 
-    <?php if (show_menu('installments')): ?>
+    <?php if (has_permission('installments.view')): ?>
       <?php sidebar_group('installments','<i class="bi bi-calendar3"></i>','Installments',[
         ['href'=>'/modules/installments/installments.php','label'=>'All Installments','icon'=>'<i class="bi bi-calendar-check"></i>'],
         ['href'=>'/modules/installments/installment_payment.php','label'=>'Receive Payment','icon'=>'<i class="bi bi-cash-coin"></i>'],
@@ -79,7 +89,7 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
       ], $BASE_URL); ?>
     <?php endif; ?>
 
-    <?php if (show_menu('inventory')): ?>
+    <?php if (has_permission('products.view')): ?>
       <?php sidebar_group('inventory','<i class="bi bi-box-seam"></i>','Inventory',[
         ['href'=>'/modules/products/products.php','label'=>'Products','icon'=>'<i class="bi bi-boxes"></i>'],
         ['href'=>'/modules/products/categories.php','label'=>'Categories','icon'=>'<i class="bi bi-tags"></i>'],
@@ -92,13 +102,13 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
       ], $BASE_URL); ?>
     <?php endif; ?>
 
-    <?php if (show_menu('stores')): ?>
+    <?php if (has_permission('stores.view')): ?>
       <?php sidebar_group('stores','<i class="bi bi-shop"></i>','Stores',[
         ['href'=>'/modules/stores/stores.php','label'=>'Manage Stores','icon'=>'<i class="bi bi-shop-window"></i>'],
       ], $BASE_URL); ?>
     <?php endif; ?>
 
-    <?php if (show_menu('procurement')): ?>
+    <?php if (has_permission('procurement.view')): ?>
       <?php sidebar_group('procurement','<i class="bi bi-journal-text"></i>','Procurement',[
         ['href'=>'/modules/procurement/shopping_list.php','label'=>'Shopping List','icon'=>'<i class="bi bi-list-check"></i>'],
         ['href'=>'/modules/procurement/suggested_list.php','label'=>'Suggested List','icon'=>'<i class="bi bi-stars"></i>'],
@@ -106,18 +116,18 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
       ], $BASE_URL); ?>
     <?php endif; ?>
 
-    <?php if (show_menu('contacts')): ?>
+    <?php if (has_permission('contacts.view')): ?>
       <?php sidebar_group('contacts','<i class="bi bi-people"></i>','Contacts',[
         ['href'=>'/modules/contacts/contacts.php','label'=>'All Contacts','icon'=>'<i class="bi bi-person-lines-fill"></i>'],
         ['href'=>'/modules/contacts/customers.php','label'=>'Customers','icon'=>'<i class="bi bi-person-check"></i>'],
         ['href'=>'/modules/contacts/suppliers.php','label'=>'Suppliers','icon'=>'<i class="bi bi-building"></i>'],
         ['href'=>'/modules/contacts/staff.php','label'=>'Staff','icon'=>'<i class="bi bi-person-workspace"></i>'],
         ['href'=>'/modules/contacts/categories_tags.php','label'=>'Categories / Tags','icon'=>'<i class="bi bi-tags"></i>'],
-        ['href'=>'/modules/contacts/export_txt.php','label'=>'Bulk Export','icon'=>'<i class="bi bi-file-earmark-arrow-down"></i>'],
+        ['href'=>'/modules/contacts/export.php','label'=>'Bulk Export','icon'=>'<i class="bi bi-file-earmark-arrow-down"></i>'],
       ], $BASE_URL); ?>
     <?php endif; ?>
 
-    <?php if (show_menu('messaging')): ?>
+    <?php if (has_permission('messaging.view')): ?>
       <?php sidebar_group('messaging','<i class="bi bi-envelope"></i>','Messaging',[
         ['href'=>'/modules/messaging/send.php','label'=>'Send Message','icon'=>'<i class="bi bi-send"></i>'],
         ['href'=>'/modules/messaging/templates.php','label'=>'Templates','icon'=>'<i class="bi bi-layout-text-sidebar"></i>'],
@@ -126,7 +136,7 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
       ], $BASE_URL); ?>
     <?php endif; ?>
 
-    <?php if (show_menu('finance')): ?>
+    <?php if (has_permission('finance.view')): ?>
       <?php sidebar_group('finance','<i class="bi bi-bank"></i>','Finance',[
         ['href'=>'/modules/finance/expenses.php','label'=>'Expenses','icon'=>'<i class="bi bi-wallet2"></i>'],
         ['href'=>'/modules/finance/capital_in.php','label'=>'Capital In','icon'=>'<i class="bi bi-arrow-down-circle"></i>'],
@@ -137,20 +147,23 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
       ], $BASE_URL); ?>
     <?php endif; ?>
 
-    <?php if (show_menu('reports')): ?>
-      <?php sidebar_group('reports','<i class="bi bi-bar-chart"></i>','Reports',[
-        ['href'=>'/modules/reports/sales.php','label'=>'Sales','icon'=>'<i class="bi bi-graph-up-arrow"></i>'],
-        ['href'=>'/modules/reports/profit.php','label'=>'Profit','icon'=>'<i class="bi bi-pie-chart"></i>'],
-        ['href'=>'/modules/reports/inventory.php','label'=>'Inventory','icon'=>'<i class="bi bi-box-seam"></i>'],
-        ['href'=>'/modules/reports/installments.php','label'=>'Installments','icon'=>'<i class="bi bi-calendar-range"></i>'],
-        ['href'=>'/modules/reports/expenses.php','label'=>'Expenses','icon'=>'<i class="bi bi-wallet2"></i>'],
-        ['href'=>'/modules/reports/capital.php','label'=>'Capital','icon'=>'<i class="bi bi-cash-stack"></i>'],
-        ['href'=>'/modules/reports/b2b_report.php','label'=>'B2B Report','icon'=>'<i class="bi bi-briefcase"></i>'],
-        ['href'=>'/modules/reports/audit.php','label'=>'Audit','icon'=>'<i class="bi bi-shield-check"></i>'],
-      ], $BASE_URL); ?>
+    <?php if (has_permission('reports.sales.view') || has_permission('reports.profit.view') || has_permission('reports.inventory.view') || has_permission('reports.installments.view') || has_permission('reports.expenses.view') || has_permission('reports.capital.view') || has_permission('reports.b2b.view') || has_permission('reports.audit.view')): ?>
+      <?php 
+      $reportItems = [];
+      if (has_permission('reports.sales.view')) $reportItems[] = ['href'=>'/modules/reports/sales.php','label'=>'Sales','icon'=>'<i class="bi bi-graph-up-arrow"></i>'];
+      if (has_permission('reports.profit.view')) $reportItems[] = ['href'=>'/modules/reports/profit.php','label'=>'Profit','icon'=>'<i class="bi bi-pie-chart"></i>'];
+      if (has_permission('reports.inventory.view')) $reportItems[] = ['href'=>'/modules/reports/inventory.php','label'=>'Inventory','icon'=>'<i class="bi bi-box-seam"></i>'];
+      if (has_permission('reports.installments.view')) $reportItems[] = ['href'=>'/modules/reports/installments.php','label'=>'Installments','icon'=>'<i class="bi bi-calendar-range"></i>'];
+      if (has_permission('reports.expenses.view')) $reportItems[] = ['href'=>'/modules/reports/expenses.php','label'=>'Expenses','icon'=>'<i class="bi bi-wallet2"></i>'];
+      if (has_permission('reports.capital.view')) $reportItems[] = ['href'=>'/modules/reports/capital.php','label'=>'Capital','icon'=>'<i class="bi bi-cash-stack"></i>'];
+      if (has_permission('reports.b2b.view')) $reportItems[] = ['href'=>'/modules/reports/b2b_report.php','label'=>'B2B Report','icon'=>'<i class="bi bi-briefcase"></i>'];
+      if (has_permission('reports.audit.view')) $reportItems[] = ['href'=>'/modules/reports/audit.php','label'=>'Audit','icon'=>'<i class="bi bi-shield-check"></i>'];
+      
+      sidebar_group('reports','<i class="bi bi-bar-chart"></i>','Reports', $reportItems, $BASE_URL); 
+      ?>
     <?php endif; ?>
 
-    <?php if (show_menu('admin')): ?>
+    <?php if (has_permission('admin.exclusive')): ?>
       <?php sidebar_group('admin','<i class="bi bi-gear"></i>','Admin',[
         ['href'=>'/modules/admin/settings.php','label'=>'Settings','icon'=>'<i class="bi bi-gear-wide-connected"></i>'],
         ['href'=>'/modules/admin/themes.php','label'=>'Themes & UI','icon'=>'<i class="bi bi-palette"></i>'],

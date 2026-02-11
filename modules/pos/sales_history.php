@@ -7,17 +7,16 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/rbac.php';
 require_once __DIR__ . '/../../includes/helpers.php';
 
-require_role('admin', 'super_admin'); // if you want both admin + staff, replace with your normal auth check
-
-// Permissions: prefer pos.view, fallback to pos.create
+// Permission-gated (NOT role-gated): if you grant all permissions to a role,
+// the user must be able to access this page.
+// Prefer pos.view, fallback to pos.create.
+require_login();
 if (function_exists('user_has_permission')) {
   $canView = user_has_permission('pos.view') || user_has_permission('pos.create');
   if (!$canView) {
     http_response_code(403);
-    die("Forbidden");
+    die('Forbidden');
   }
-} else {
-  // if RBAC helper missing, allow (dev mode)
 }
 
 $db = $GLOBALS['db'] ?? null;
@@ -333,6 +332,145 @@ require_once __DIR__ . '/../../templates/layout/header.php';
           .filter-card .row {
             gap: 0.5rem;
           }
+        }
+      </style>
+
+      <!-- Dark Theme Styles for Sales History -->
+      <style>
+        [data-theme="dark"] .sales-header {
+          background: linear-gradient(135deg, #375a7f 0%, #2f4f70 100%);
+          color: white;
+        }
+
+        [data-theme="dark"] .filter-card {
+          background: #2d2d2d;
+          border-color: rgba(255,255,255,0.12);
+        }
+
+        [data-theme="dark"] .filter-card .card-header {
+          background: #222222;
+          border-color: rgba(255,255,255,0.12);
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .filter-card .card-body {
+          background: #2d2d2d;
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .table-card {
+          background: #2d2d2d;
+          border-color: rgba(255,255,255,0.12);
+        }
+
+        [data-theme="dark"] .table-card .card-header {
+          background: #222222;
+          border-color: rgba(255,255,255,0.12);
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .table {
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .table th {
+          background: #222222;
+          border-color: rgba(255,255,255,0.12);
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .table td {
+          border-color: rgba(255,255,255,0.12);
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .table-hover tbody tr:hover {
+          background: #222222;
+        }
+
+        [data-theme="dark"] .stat-card {
+          background: #2d2d2d;
+          border: 1px solid rgba(255,255,255,0.12);
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .stat-value {
+          color: #ffffff;
+        }
+
+        [data-theme="dark"] .stat-label {
+          color: #bdbdbd;
+        }
+
+        [data-theme="dark"] .form-control {
+          background: #2d2d2d;
+          border-color: rgba(255,255,255,0.12);
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .form-control::placeholder {
+          color: #bdbdbd;
+        }
+
+        [data-theme="dark"] .form-select {
+          background: #2d2d2d;
+          border-color: rgba(255,255,255,0.12);
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .form-label {
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .text-muted {
+          color: #bdbdbd !important;
+        }
+
+        [data-theme="dark"] h2 {
+          color: #ffffff;
+        }
+
+        [data-theme="dark"] .btn-action {
+          background: #2d2d2d;
+          border-color: rgba(255,255,255,0.12);
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .btn-action:hover {
+          background: #375a7f;
+          border-color: #375a7f;
+          color: #ffffff;
+        }
+
+        [data-theme="dark"] .pagination .page-link {
+          background: #2d2d2d;
+          border-color: rgba(255,255,255,0.12);
+          color: #eaeaea;
+        }
+
+        [data-theme="dark"] .pagination .page-item.active .page-link {
+          background: #375a7f;
+          border-color: #375a7f;
+          color: #ffffff;
+        }
+
+        [data-theme="dark"] .badge {
+          background: #375a7f;
+          color: #ffffff;
+        }
+
+        [data-theme="dark"] .card-header.bg-white {
+          background: #222222 !important;
+          color: #eaeaea !important;
+          border-color: rgba(255,255,255,0.12) !important;
+        }
+
+        [data-theme="dark"] .card-header.bg-white h6 {
+          color: #eaeaea !important;
+        }
+
+        [data-theme="dark"] .card-header.bg-white i {
+          color: #eaeaea !important;
         }
       </style>
 

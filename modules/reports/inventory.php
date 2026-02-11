@@ -7,8 +7,8 @@ require_once dirname(dirname(__DIR__)) . '/includes/auth.php';
 require_once dirname(dirname(__DIR__)) . '/includes/helpers.php';
 require_once dirname(dirname(__DIR__)) . '/includes/rbac.php';
 
-if (function_exists('require_admin_login')) require_admin_login();
-require_permission('products.view');
+//if (function_exists('require_admin_login')) require_admin_login();
+require_permission('reports.inventory.view');
 
 $db = $GLOBALS['db'] ?? null;
 $BASE_URL = $GLOBALS['BASE_URL'] ?? '';

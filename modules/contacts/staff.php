@@ -23,7 +23,7 @@ if ($user_id <= 0) {
     exit;
 }
 
-require_permission('admin.view');
+require_permission('contacts.view');
 
 $message = '';
 $message_type = '';

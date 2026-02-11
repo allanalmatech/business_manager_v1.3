@@ -5,8 +5,8 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/helpers.php';
 require_once __DIR__ . '/../../includes/rbac.php';
 
-if (function_exists('require_admin_login')) require_admin_login();
-require_permission('reports.view');
+//if (function_exists('require_admin_login')) require_admin_login();
+require_permission('reports.profit.view');
 
 $db = $GLOBALS['db'];
 

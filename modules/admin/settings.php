@@ -7,8 +7,8 @@ require_once dirname(dirname(__DIR__)) . '/includes/auth.php';
 require_once dirname(dirname(__DIR__)) . '/includes/helpers.php';
 require_once dirname(dirname(__DIR__)) . '/includes/rbac.php';
 
-if (function_exists('require_admin_login')) require_admin_login();
-require_permission('settings.manage');
+require_super_admin();
+require_permission('admin.settings');
 
 $db = $GLOBALS['db'] ?? null;
 
@@ -62,6 +62,7 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
       <div class="card shadow-sm mb-3">
         <div class="card-body">
           <form id="formAddSetting" class="row g-2">
+            <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf'] ?? '') ?>">
             <div class="col-md-4">
               <input class="form-control" name="key" placeholder="key e.g. business_name" required>
             </div>
@@ -125,9 +126,16 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
   </div>
 </div>
 
+<script>
+  window.APP_CFG = {
+    baseUrl: <?= json_encode($GLOBALS['BASE_URL'] ?? '') ?>
+  };
+</script>
+
 <div class="modal fade" id="modalEditSetting" tabindex="-1">
   <div class="modal-dialog">
     <form class="modal-content" id="formEditSetting">
+      <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf'] ?? '') ?>">
       <div class="modal-header">
         <h5 class="modal-title">Edit Setting</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -179,9 +187,11 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
     }
   };
 
+  const BASE = (window.APP_CFG?.baseUrl || '').replace(/\/$/, '');
+
   document.getElementById('formAddSetting')?.addEventListener('submit', async (e)=>{
     e.preventDefault();
-    const j = await post('api/settings/upsert.php', new FormData(e.target));
+    const j = await post(`${BASE}/api/settings/upsert.php`, new FormData(e.target));
     alert(j.message || (j.success ? 'Saved' : 'Failed'));
     if (j.success) location.reload();
   });
@@ -196,7 +206,7 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
 
   document.getElementById('formEditSetting')?.addEventListener('submit', async (e)=>{
     e.preventDefault();
-    const j = await post('api/settings/upsert.php', new FormData(e.target));
+    const j = await post(`${BASE}/api/settings/upsert.php`, new FormData(e.target));
     alert(j.message || (j.success ? 'Updated' : 'Failed'));
     if (j.success) location.reload();
   });
@@ -206,7 +216,8 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
       if (!confirm('Delete this setting?')) return;
       const fd = new FormData();
       fd.append('key', btn.dataset.key || '');
-      const j = await post('api/settings/delete.php', fd);
+      fd.append('csrf', document.querySelector('input[name="csrf"]')?.value || '');
+      const j = await post(`${BASE}/api/settings/delete.php`, fd);
       alert(j.message || (j.success ? 'Deleted' : 'Failed'));
       if (j.success) location.reload();
     });

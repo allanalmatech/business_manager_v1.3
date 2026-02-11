@@ -2,6 +2,11 @@
 // includes/bootstrap.php
 declare(strict_types=1);
 
+// Suppress errors for API endpoints
+if (str_contains($_SERVER['REQUEST_URI'], '_api.php')) {
+    ini_set('display_errors', '0');
+}
+
 require_once __DIR__ . '/../config/db.php';
 
 $dbCfg = require __DIR__ . '/../config/db.php';

@@ -7,7 +7,8 @@ require_once dirname(dirname(__DIR__)) . '/includes/auth.php';
 require_once dirname(dirname(__DIR__)) . '/includes/helpers.php';
 require_once dirname(dirname(__DIR__)) . '/includes/rbac.php';
 
-if (function_exists('require_admin_login')) require_admin_login();
+// Super-admin-only module (never visible/accessible to non-super_admin)
+require_super_admin();
 require_permission('users.view');
 
 $db = $GLOBALS['db'] ?? null;
@@ -87,10 +88,11 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
             $pages = max(1, (int)ceil($total / $limit));
 
             // list
-            $sql = "SELECT id, full_name, email, phone, role_id, is_active, created_at
-                    FROM users
+            $sql = "SELECT u.id, u.username, u.full_name, u.email, u.phone, u.role_id, u.is_active, u.created_at, r.name as role_name
+                    FROM users u
+                    LEFT JOIN roles r ON u.role_id = r.id
                     WHERE $where
-                    ORDER BY id DESC
+                    ORDER BY u.id DESC
                     LIMIT ? OFFSET ?";
             $st = $db->prepare($sql);
             $bindTypes = $types . "ii";
@@ -104,6 +106,13 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
             $rows = [];
             while ($r = $rs->fetch_assoc()) $rows[] = $r;
             $st->close();
+
+            // Fetch roles for dropdowns
+            $roles = [];
+            $rolesResult = $db->query("SELECT id, name FROM roles ORDER BY name");
+            if ($rolesResult) {
+                $roles = $rolesResult->fetch_all(MYSQLI_ASSOC);
+            }
           ?>
 
           <div class="card shadow-sm">
@@ -126,10 +135,11 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
                   <thead class="table-light">
                     <tr>
                       <th>#</th>
+                      <th>Username</th>
                       <th>Name</th>
                       <th>Email</th>
                       <th>Phone</th>
-                      <th>Role ID</th>
+                      <th>Role</th>
                       <th>Status</th>
                       <th>Created</th>
                       <th class="text-end">Actions</th>
@@ -141,15 +151,17 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
                     <?php else: foreach ($rows as $r): ?>
                       <tr>
                         <td><?= (int)$r['id'] ?></td>
+                        <td><?= h($r['username']) ?></td>
                         <td class="fw-semibold"><?= h($r['full_name'] ?? '') ?></td>
                         <td><?= h($r['email'] ?? '') ?></td>
                         <td><?= h($r['phone'] ?? '') ?></td>
-                        <td><?= h($r['role_id'] ?? '') ?></td>
+                        <td><?= h($r['role_name'] ?? 'Unknown') ?></td>
                         <td><?= h($r['is_active'] ? 'Active' : 'Inactive') ?></td>
                         <td><?= h($r['created_at'] ?? '') ?></td>
                         <td class="text-end">
                           <button class="btn btn-sm btn-outline-secondary btnEdit"
                                   data-id="<?= (int)$r['id'] ?>"
+                                  data-username="<?= h($r['username'] ?? '') ?>"
                                   data-name="<?= h($r['full_name'] ?? '') ?>"
                                   data-email="<?= h($r['email'] ?? '') ?>"
                                   data-phone="<?= h($r['phone'] ?? '') ?>"
@@ -214,7 +226,11 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
       </div>
       <div class="modal-body">
         <div class="mb-2">
-          <label class="form-label">Name</label>
+          <label class="form-label">Username</label>
+          <input class="form-control" name="username" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Full Name</label>
           <input class="form-control" name="name" required>
         </div>
         <div class="mb-2">
@@ -226,8 +242,13 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
           <input class="form-control" name="phone">
         </div>
         <div class="mb-2">
-          <label class="form-label">Role ID</label>
-          <input class="form-control" name="role_id" type="number" min="1">
+          <label class="form-label">Role</label>
+          <select class="form-select" name="role_id" required>
+            <option value="">Select Role</option>
+            <?php foreach ($roles as $role): ?>
+              <option value="<?= (int)$role['id'] ?>"><?= h($role['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
         </div>
         <div class="mb-2">
           <label class="form-label">Status</label>
@@ -260,7 +281,11 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
       <div class="modal-body">
         <input type="hidden" name="id" id="edit_id">
         <div class="mb-2">
-          <label class="form-label">Name</label>
+          <label class="form-label">Username</label>
+          <input class="form-control" name="username" id="edit_username" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Full Name</label>
           <input class="form-control" name="name" id="edit_name" required>
         </div>
         <div class="mb-2">
@@ -272,8 +297,13 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
           <input class="form-control" name="phone" id="edit_phone">
         </div>
         <div class="mb-2">
-          <label class="form-label">Role ID</label>
-          <input class="form-control" name="role_id" id="edit_role_id" type="number" min="1">
+          <label class="form-label">Role</label>
+          <select class="form-select" name="role_id" id="edit_role_id" required>
+            <option value="">Select Role</option>
+            <?php foreach ($roles as $role): ?>
+              <option value="<?= (int)$role['id'] ?>"><?= h($role['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
         </div>
         <div class="mb-2">
           <label class="form-label">Status</label>
@@ -296,6 +326,8 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
 </div>
 
 <script>
+const BASE_URL = <?= json_encode($GLOBALS['BASE_URL'] ?? '') ?>;
+
 (async function(){
   const toast = (msg, ok=true) => {
     const el = document.createElement('div');
@@ -311,8 +343,16 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
 
   const postForm = async (url, form) => {
     const fd = new FormData(form);
-    const res = await fetch(url, {method:'POST', body: fd, credentials:'same-origin'});
-    return await res.json();
+    const fullUrl = url.startsWith('http') ? url : (BASE_URL + '/' + url);
+    const res = await fetch(fullUrl, {method:'POST', body: fd, credentials:'same-origin'});
+    const text = await res.text();
+    
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.error('JSON Parse Error:', e);
+      return {success: false, message: 'Invalid server response'};
+    }
   };
 
   // Add
@@ -328,6 +368,7 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
   document.querySelectorAll('.btnEdit').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       document.getElementById('edit_id').value = btn.dataset.id||'';
+      document.getElementById('edit_username').value = btn.dataset.username||'';
       document.getElementById('edit_name').value = btn.dataset.name||'';
       document.getElementById('edit_email').value = btn.dataset.email||'';
       document.getElementById('edit_phone').value = btn.dataset.phone||'';
@@ -352,10 +393,18 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
       if (!confirm('Delete this user?')) return;
       const fd = new FormData();
       fd.append('id', btn.dataset.id||'');
-      const res = await fetch('api/users/delete.php', {method:'POST', body: fd, credentials:'same-origin'});
-      const j = await res.json();
-      if (j.success) { toast(j.message||'Deleted'); location.reload(); }
-      else toast(j.message||'Failed', false);
+      const fullUrl = BASE_URL + '/api/users/delete.php';
+      const res = await fetch(fullUrl, {method:'POST', body: fd, credentials:'same-origin'});
+      const text = await res.text();
+      
+      try {
+        const j = JSON.parse(text);
+        if (j.success) { toast(j.message||'Deleted'); location.reload(); }
+        else toast(j.message||'Failed', false);
+      } catch (e) {
+        console.error('JSON Parse Error:', e);
+        toast('Invalid server response', false);
+      }
     });
   });
 })();

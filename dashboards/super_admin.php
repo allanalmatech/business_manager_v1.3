@@ -87,8 +87,8 @@ if ($pendingApprovals > 0) {
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
       <div class="card-body p-4">
         <div class="d-flex align-items-center justify-content-between mb-3">
-          <div class="bg-primary bg-opacity-10 p-3 rounded-4">
-            <i class="bi bi-cash-stack text-primary fs-4"></i>
+          <div class="bg-primary bg-opacity-25 p-3 rounded-4">
+            <i class="bi bi-cash-stack text-white fs-4" style="font-weight: 700;"></i>
           </div>
           <span class="badge bg-success bg-opacity-10 text-success rounded-pill">Live</span>
         </div>
@@ -227,12 +227,12 @@ if ($pendingApprovals > 0) {
         <?php else: ?>
           <div class="alert-list">
             <?php foreach ($alerts as $alert): ?>
-              <div class="d-flex align-items-start gap-3 mb-3 p-3 bg-<?= $alert['type'] ?> bg-opacity-10 rounded-3">
-                <div class="bg-<?= $alert['type'] ?> bg-opacity-20 p-2 rounded-circle">
-                  <i class="bi bi-<?= $alert['icon'] ?> text-<?= $alert['type'] ?> fs-5"></i>
+              <div class="d-flex align-items-start gap-3 mb-3 p-3 bg-<?= $alert['type'] ?> bg-opacity-25 rounded-3">
+                <div class="bg-<?= $alert['type'] ?> bg-opacity-50 p-2 rounded-circle">
+                  <i class="bi bi-<?= $alert['icon'] ?> text-white fs-5"></i>
                 </div>
                 <div class="flex-grow-1">
-                  <p class="mb-0 small fw-medium text-<?= $alert['type'] ?>"><?= $alert['message'] ?></p>
+                  <p class="mb-0 small fw-medium text-dark"><?= $alert['message'] ?></p>
                 </div>
               </div>
             <?php endforeach; ?>

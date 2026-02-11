@@ -182,7 +182,7 @@ if ($action === 'search_products') {
     LEFT JOIN stock_by_location s 
       ON s.product_id = p.id AND s.location_id = ?
     WHERE p.is_active = 1
-      AND (p.sku LIKE ? OR p.name LIKE ? OR p.tags LIKE ?)
+      AND (p.sku LIKE ? OR p.name LIKE ?)
     ORDER BY p.name ASC
     LIMIT 20
   ";
@@ -190,7 +190,7 @@ if ($action === 'search_products') {
   $st = $db->prepare($sql);
   if (!$st) out(['ok'=>false,'error'=>$db->error], 500);
 
-  $st->bind_param('isss', $location_id, $like, $like, $like);
+  $st->bind_param('iss', $location_id, $like, $like);
   $st->execute();
   $rs = $st->get_result();
 

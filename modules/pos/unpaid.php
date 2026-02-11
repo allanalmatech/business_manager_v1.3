@@ -211,7 +211,7 @@ require_once __DIR__ . '/../../templates/layout/header.php';
           font-weight: 500;
         }
         .unpaid-badge {
-          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+          background: #dc3545;
           color: white;
           font-weight: 600;
         }
@@ -268,6 +268,37 @@ require_once __DIR__ . '/../../templates/layout/header.php';
           margin-bottom: 2rem;
           border-radius: var(--card-radius);
         }
+
+        /* Dark theme card header fixes */
+        [data-theme="dark"] .card-header.bg-white {
+          background: #222222 !important;
+          color: #eaeaea !important;
+          border-color: rgba(255,255,255,0.12) !important;
+        }
+
+        [data-theme="dark"] .card-header.bg-white h6 {
+          color: #eaeaea !important;
+        }
+
+        [data-theme="dark"] .card-header.bg-white i {
+          color: #eaeaea !important;
+        }
+
+        /* Dark theme stat cards */
+        [data-theme="dark"] .stat-card {
+          background: #2d2d2d !important;
+          border: 1px solid rgba(255,255,255,0.12) !important;
+          color: #eaeaea !important;
+        }
+
+        [data-theme="dark"] .stat-value {
+          color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .stat-label {
+          color: #bdbdbd !important;
+        }
+
         @media (max-width: 768px) {
           .summary-stats {
             flex-direction: column;

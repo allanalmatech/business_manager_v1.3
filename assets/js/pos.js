@@ -647,7 +647,13 @@
   function wireEvents() {
     elSearchInput?.addEventListener("input", doSearch);
     elHideResults?.addEventListener("click", hideResults);
-    elLoc?.addEventListener("change", () => loadQuickItems());
+    elLoc?.addEventListener("change", () => {
+    loadQuickItems();
+    // Re-run search with current keyword to update stock for new location
+    if (elSearchInput.value.trim()) {
+      doSearch();
+    }
+  });
     
     document.querySelectorAll('input[name="pricing_mode"]').forEach(r => {
       r.addEventListener("change", () => loadQuickItems());
@@ -724,7 +730,7 @@
       if (!btn) return;
 
       btn.disabled = true;
-      const oldText = btn.innerHTML;
+      const originalText = 'FINALIZE & PRINT';
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
 
       try {
@@ -733,6 +739,10 @@
         console.log('Sale confirmed successfully');
         const modalEl = $("previewModal");
         if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        
+        // Reset button state after successful sale
+        btn.disabled = false;
+        btn.innerHTML = originalText;
       } catch (err) {
         console.error('Sale confirmation error:', err);
         console.error('Error details:', {

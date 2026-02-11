@@ -166,15 +166,15 @@ include __DIR__ . '/../../templates/layout/header.php';
                   </div>
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Created</label>
+                  <label class="form-label">Created At</label>
                   <div class="form-control-plaintext">
-                    <?= h(date('M j, Y H:i', strtotime($brand['created_at']))) ?>
+                    <?= h($brand['created_at'] ? date('M j, Y H:i', strtotime($brand['created_at'])) : 'N/A') ?>
                   </div>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Last Updated</label>
                   <div class="form-control-plaintext">
-                    <?= h(date('M j, Y H:i', strtotime($brand['updated_at']))) ?>
+                    <?= h($brand['updated_at'] ? date('M j, Y H:i', strtotime($brand['updated_at'])) : 'N/A') ?>
                   </div>
                 </div>
               </div>
@@ -199,24 +199,120 @@ include __DIR__ . '/../../templates/layout/header.php';
 </div>
 
 <script>
+const BASE_URL = <?= json_encode($GLOBALS['BASE_URL'] ?? '') ?>;
+const currentBrandId = <?= (int)($brand['id'] ?? 0) ?>;
+
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, setting up event listeners');
+  
+  // Auto-generate slug when name changes
+  const nameField = document.getElementById('name');
+  if (nameField) {
+    nameField.addEventListener('input', function() {
+      console.log('Name input changed');
+      generateSlug();
+    });
+  }
+  
+  // Manual slug generation
+  const slugField = document.getElementById('slug');
+  if (slugField) {
+    slugField.addEventListener('input', function() {
+      console.log('Slug manually edited');
+      // When user manually edits slug, don't auto-update on name change
+      this.dataset.manual = 'true';
+    });
+  }
+  
+  // Generate initial slug if needed
+  if (nameField && slugField) {
+    const currentSlug = slugField.value;
+    // Only auto-generate if slug is empty or was auto-generated
+    if (!currentSlug || currentSlug.includes('-001') || currentSlug === currentSlug.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim('-')) {
+      generateSlug();
+    }
+  }
+});
+
 function generateSlug() {
   const name = document.getElementById('name').value;
+  console.log('Generating slug for:', name);
+  
   if (name.trim()) {
-    const slug = name.toLowerCase()
+    let slug = name.toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .trim('-');
+    
+    console.log('Base slug:', slug);
+    checkSlugExists(slug);
+  }
+}
+
+async function checkSlugExists(slug) {
+  console.log('Checking slug exists:', slug);
+  
+  try {
+    const response = await fetch(`${BASE_URL}/api/brands/check_slug.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        slug: slug,
+        exclude_id: currentBrandId
+      })
+    });
+    
+    console.log('API response status:', response.status);
+    const result = await response.json();
+    console.log('API result:', result);
+    
+    if (result.error) {
+      console.error('API error:', result.error);
+      // Fallback to basic slug
+      document.getElementById('slug').value = slug;
+      return;
+    }
+    
+    if (result.exists) {
+      console.log('Slug exists, finding available...');
+      // Slug exists, add incrementing number
+      let finalSlug = slug;
+      let counter = 1;
+      
+      // Try up to 100 variations
+      while (counter <= 100) {
+        finalSlug = slug + '-' + counter.toString().padStart(3, '0');
+        
+        // Check if this specific slug is in the suggestions
+        if (!result.suggestions || !result.suggestions.includes(finalSlug)) {
+          break;
+        }
+        counter++;
+      }
+      
+      console.log('Final slug with increment:', finalSlug);
+      document.getElementById('slug').value = finalSlug;
+    } else {
+      console.log('Slug is available:', slug);
+      document.getElementById('slug').value = slug;
+    }
+  } catch (error) {
+    console.error('Error checking slug:', error);
+    // Fallback to basic slug generation
     document.getElementById('slug').value = slug;
   }
 }
 
-// Auto-generate slug when name changes
-document.getElementById('name').addEventListener('input', function() {
-  if (!document.getElementById('slug').value) {
-    generateSlug();
-  }
-});
+// Simple test function
+function testSlugGeneration() {
+  console.log('Testing slug generation...');
+  const testSlug = 'test-brand';
+  checkSlugExists(testSlug);
+}
 </script>
 
 <?php include __DIR__ . '/../../templates/layout/footer.php'; ?>

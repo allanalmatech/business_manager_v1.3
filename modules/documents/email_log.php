@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/helpers.php';
 require_once __DIR__ . '/../../includes/rbac.php';
 
-require_permission('admin.view'); // change to your permission if needed (e.g. 'admin.view')
+require_permission('documents.view');
 
 $db = $GLOBALS['db'] ?? null;
 

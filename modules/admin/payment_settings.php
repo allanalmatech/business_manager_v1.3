@@ -7,7 +7,7 @@ require_once dirname(dirname(__DIR__)) . '/includes/auth.php';
 require_once dirname(dirname(__DIR__)) . '/includes/helpers.php';
 require_once dirname(dirname(__DIR__)) . '/includes/rbac.php';
 
-if (function_exists('require_admin_login')) require_admin_login();
+require_super_admin();
 require_permission('payments.manage');
 
 $db = $GLOBALS['db'] ?? null;

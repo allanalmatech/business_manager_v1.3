@@ -14,7 +14,7 @@ require_login();
 require_permission('products.view');
 
 $db = $GLOBALS['db'];
-$action = $_GET['action'] ?? '';
+$action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 function ok($data=[]){ echo json_encode(['ok'=>true,'data'=>$data]); exit; }
 function err($m,$c=400){ http_response_code($c); echo json_encode(['ok'=>false,'error'=>$m]); exit; }
@@ -250,7 +250,7 @@ if ($action === 'stock_in') {
        qty_change, qty_before, qty_after, reference_type, reference_id, note, created_by)
       VALUES (?, NULL, ?, 'stock_in', ?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmt->bind_param("idddsssi",
+    $stmt->bind_param("iidddsssi",
       $product_id,
       $to_location,
       $change,

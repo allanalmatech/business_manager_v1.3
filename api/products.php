@@ -43,7 +43,7 @@ if ($isAjax) {
 $db = $GLOBALS['db'] ?? null;
 if (!($db instanceof mysqli)) out_err('DB not available', 500);
 
-$action = (string)($_GET['action'] ?? 'list');
+$action = (string)($_GET['action'] ?? $_POST['action'] ?? 'list');
 
 // Permission gate (JSON-safe for AJAX)
 function need_perm(string $perm, bool $isAjax): void {
@@ -207,6 +207,118 @@ try {
   }
 
   /* =========================
+     CATEGORIES SAVE (CREATE/UPDATE)
+  ========================== */
+  if ($action === 'categories_save') {
+    need_perm('products.update', $isAjax);
+
+    $id = (int)($_POST['id'] ?? 0);
+    $name = trim((string)($_POST['name'] ?? ''));
+    $is_active = (int)($_POST['is_active'] ?? 1);
+
+    if (empty($name)) {
+      out_err('Category name is required');
+    }
+
+    if ($id > 0) {
+      // Update existing category
+      $stmt = $db->prepare("UPDATE product_categories SET name = ?, is_active = ? WHERE id = ?");
+      if (!$stmt) out_err('Prepare failed', 500);
+      
+      $stmt->bind_param("sii", $name, $is_active, $id);
+      if (!$stmt->execute()) {
+        out_err('Update failed: ' . $stmt->error);
+      }
+      $stmt->close();
+      
+      // Log action
+      if (function_exists('audit_log')) {
+        audit_log('categories.update', 'categories', (string)$id, "Updated category: $name");
+      }
+      
+      out_ok(['message' => 'Category updated successfully', 'id' => $id]);
+    } else {
+      // Create new category
+      $stmt = $db->prepare("INSERT INTO product_categories (name, is_active) VALUES (?, ?)");
+      if (!$stmt) out_err('Prepare failed', 500);
+      
+      $stmt->bind_param("si", $name, $is_active);
+      if (!$stmt->execute()) {
+        out_err('Insert failed: ' . $stmt->error);
+      }
+      $newId = $stmt->insert_id;
+      $stmt->close();
+      
+      // Log action
+      if (function_exists('audit_log')) {
+        audit_log('categories.create', 'categories', (string)$newId, "Created category: $name");
+      }
+      
+      out_ok(['message' => 'Category created successfully', 'id' => $newId]);
+    }
+  }
+
+  /* =========================
+     CATEGORIES DELETE
+  ========================== */
+  if ($action === 'categories_delete') {
+    need_perm('products.delete', $isAjax);
+
+    $id = (int)($_POST['id'] ?? 0);
+    if ($id <= 0) out_err('Invalid ID');
+
+    // Check if category is being used by products
+    $check = $db->prepare("SELECT COUNT(*) as count FROM products WHERE category_id = ?");
+    if (!$check) out_err('Prepare failed', 500);
+    
+    $check->bind_param("i", $id);
+    $check->execute();
+    $result = $check->get_result()->fetch_assoc();
+    $check->close();
+
+    if ($result['count'] > 0) {
+      out_err('Cannot delete category - it is being used by ' . $result['count'] . ' products');
+    }
+
+    // Delete the category
+    $stmt = $db->prepare("DELETE FROM product_categories WHERE id = ?");
+    if (!$stmt) out_err('Prepare failed', 500);
+    
+    $stmt->bind_param("i", $id);
+    if (!$stmt->execute()) {
+      out_err('Delete failed: ' . $stmt->error);
+    }
+    $stmt->close();
+    
+    // Log action
+    if (function_exists('audit_log')) {
+      audit_log('categories.delete', 'categories', (string)$id, "Deleted category ID: $id");
+    }
+    
+    out_ok(['message' => 'Category deleted successfully']);
+  }
+
+  /* =========================
+     CATEGORIES GET (single)
+  ========================== */
+  if ($action === 'categories_get') {
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id <= 0) out_err('Invalid ID');
+
+    $stmt = $db->prepare("SELECT id, name, is_active FROM product_categories WHERE id = ? LIMIT 1");
+    if (!$stmt) out_err('Prepare failed', 500);
+
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) out_err('Category not found', 404);
+    
+    out_ok($row);
+  }
+
+  /* =========================
      GET (returns brand_id too)
   ========================== */
   if ($action === 'get') {
@@ -326,15 +438,15 @@ try {
         $stmt = $db->prepare("
           INSERT INTO products
           (category_id, brand_id, name, sku, description, source, unit_type, unit_name, pieces_per_box,
-           cost_price, wholesale_price, retail_price, qty_base, low_level_base, default_location_id, is_active, images)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           cost_price, wholesale_price, retail_price, qty_base, low_level_base, default_location_id, is_active, images, created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW())
         ");
         if (!$stmt) throw new Exception('Prepare failed');
 
         $imagesJson = json_encode($images);
-        // types: i i s s s s s s i d d d d d i i s  (17 params)
+        // types: i i s s s s s i d d d d i i s (17 params)
         $stmt->bind_param(
-          "iissssssi" . "ddddd" . "iis",
+          "iissssssidddddiis",
           $category_id, $brand_id, $name, $sku, $desc, $source, $unit_type, $unit_name, $ppb,
           $cost, $wholesale, $retail, $qty_base, $low_base,
           $default_location_id, $is_active, $imagesJson
@@ -371,9 +483,9 @@ try {
       if (!$stmt) throw new Exception('Prepare failed');
 
       $imagesJson = json_encode($images);
-      // types: i i s s s s s s i d d d d d i i s i  (18 params)
+      // types: i i s s s s s i d d d d i i s i  (18 params)
       $stmt->bind_param(
-        "iissssssi" . "ddddd" . "iisi",
+        "iissssssidddddiisi",
         $category_id, $brand_id, $name, $sku, $desc, $source,
         $unit_type, $unit_name, $ppb,
         $cost, $wholesale, $retail,
@@ -550,6 +662,80 @@ try {
 
     audit_log('products.delete', 'product', (string)$id, "Deleted");
     out_ok(['id' => $id]);
+  }
+
+  /* =========================
+     STOCK IN RECORD
+  ========================== */
+  if ($action === 'stock_in_record') {
+    need_perm('products.update', $isAjax);
+
+    $location_id = (int)($_POST['location_id'] ?? 0);
+    $product_id = (int)($_POST['product_id'] ?? 0);
+    $qty_change = (float)($_POST['qty_change'] ?? 0);
+    $unit_type = trim((string)($_POST['unit_type'] ?? ''));
+    $unit_price = (float)($_POST['unit_price'] ?? 0);
+    $note = trim((string)($_POST['note'] ?? ''));
+
+    if ($location_id <= 0) out_err('Location is required');
+    if ($product_id <= 0) out_err('Product is required');
+    if ($qty_change <= 0) out_err('Quantity must be greater than 0');
+    if (empty($unit_type)) out_err('Unit type is required');
+    if ($unit_price < 0) out_err('Unit price cannot be negative');
+
+    // Verify location exists
+    $locCheck = $db->prepare("SELECT 1 FROM locations WHERE id=? AND is_active=1 LIMIT 1");
+    if (!$locCheck) out_err('Prepare failed', 500);
+    $locCheck->bind_param("i", $location_id);
+    $locCheck->execute();
+    $locExists = $locCheck->get_result()->fetch_row();
+    $locCheck->close();
+    if (!$locExists) out_err('Invalid location');
+
+    // Verify product exists
+    $prodCheck = $db->prepare("SELECT 1 FROM products WHERE id=? LIMIT 1");
+    if (!$prodCheck) out_err('Prepare failed', 500);
+    $prodCheck->bind_param("i", $product_id);
+    $prodCheck->execute();
+    $prodExists = $prodCheck->get_result()->fetch_row();
+    $prodCheck->close();
+    if (!$prodExists) out_err('Invalid product');
+
+    $db->begin_transaction();
+    try {
+      // Update or insert stock by location
+      $stmt = $db->prepare("
+        INSERT INTO stock_by_location (product_id, location_id, qty_base, low_level_base)
+        VALUES (?, ?, ?, 0)
+        ON DUPLICATE KEY UPDATE qty_base = qty_base + VALUES(qty_base)
+      ");
+      if (!$stmt) throw new Exception('Prepare failed');
+      $stmt->bind_param("iid", $product_id, $location_id, $qty_change);
+      if (!$stmt->execute()) throw new Exception('Stock update failed');
+      $stmt->close();
+
+      // Record stock movement
+      $stmt = $db->prepare("
+        INSERT INTO stock_movements (product_id, location_id, movement_type, quantity, unit_type, unit_price, notes, created_by)
+        VALUES (?, ?, 'stock_in', ?, ?, ?, ?, ?)
+      ");
+      if (!$stmt) throw new Exception('Prepare failed');
+      $userId = (int)($_SESSION['user']['id'] ?? 0);
+      $stmt->bind_param("iidsssi", $product_id, $location_id, $qty_change, $unit_type, $unit_price, $note, $userId);
+      if (!$stmt->execute()) throw new Exception('Stock movement record failed');
+      $stmt->close();
+
+      // Log action
+      if (function_exists('audit_log')) {
+        audit_log('stock.in', 'stock', (string)$product_id, "Stock in: {$qty_change} {$unit_type} at location {$location_id}");
+      }
+
+      $db->commit();
+      out_ok(['message' => 'Stock recorded successfully']);
+    } catch (Exception $e) {
+      $db->rollback();
+      out_err('Stock in failed: ' . $e->getMessage());
+    }
   }
 
   /* =========================

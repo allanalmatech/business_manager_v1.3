@@ -1,6 +1,6 @@
 // assets/js/stock_in.js
 (() => {
-  const api = (action) => `${window.APP.BASE_URL}/api/products.php?action=${action}`;
+  const api = (action) => `${window.APP.BASE_URL}/api/stock.php?action=${action}`;
 
   const el = (id) => document.getElementById(id);
 
@@ -56,7 +56,7 @@
   async function loadProducts() {
     try {
       console.log('DEBUG: Loading products from API...');
-      const apiUrl = api("list") + "&limit=500";
+      const apiUrl = `${window.APP.BASE_URL}/api/products.php?action=list&limit=500`;
       console.log('DEBUG: API URL:', apiUrl);
       
       const res = await fetch(apiUrl);
@@ -118,7 +118,6 @@
   }
 
   async function updateCurrentStock() {
-    const locId = locationId.value;
     const pid = productId.value;
     
     if (!pid) {
@@ -126,13 +125,8 @@
       return;
     }
     
-    if (!locId) {
-      currentStock.textContent = "Select a location to see current quantity.";
-      return;
-    }
-    
     try {
-      // Fetch stock for specific product and location
+      // Fetch stock for all locations for this product
       const res = await fetch(`${window.APP.BASE_URL}/api/stock.php?action=stock_locations&product_id=${pid}`);
       const j = await res.json();
       
@@ -143,47 +137,62 @@
       }
       
       const stockData = j.data || [];
-      const locationStock = stockData.find(s => String(s.location_id) === locId);
       const product = products.find(p => String(p.id) === pid);
       
-      if (product && locationStock) {
-        const totalPieces = Number(locationStock.qty_base || 0);
+      if (product && stockData.length > 0) {
         const pcsPerBox = product.pieces_per_box || 0;
         const unitType = product.unit_type || 'units';
         
-        let stockDisplay = '';
+        let stockDisplay = `<strong>${product.name}</strong><br>`;
+        let totalStock = 0;
+        
+        stockData.forEach(location => {
+          const locationQty = Number(location.qty_base || 0);
+          totalStock += locationQty;
+          
+          let locationStockDisplay = '';
+          if (unitType === 'boxes' && pcsPerBox > 0) {
+            const fullBoxes = Math.floor(locationQty / pcsPerBox);
+            const remainingPieces = locationQty % pcsPerBox;
+            locationStockDisplay = `${fullBoxes} boxes`;
+            if (remainingPieces > 0) {
+              locationStockDisplay += ` + ${remainingPieces} pieces`;
+            }
+          } else if (unitType === 'pieces' && pcsPerBox > 0) {
+            const fullBoxes = Math.floor(locationQty / pcsPerBox);
+            const remainingPieces = locationQty % pcsPerBox;
+            locationStockDisplay = `${locationQty.toLocaleString()} pieces`;
+            if (fullBoxes > 0) {
+              locationStockDisplay += ` (${fullBoxes} boxes`;
+              if (remainingPieces > 0) {
+                locationStockDisplay += ` + ${remainingPieces} pieces`;
+              }
+              locationStockDisplay += ')';
+            }
+          } else {
+            locationStockDisplay = `${locationQty.toLocaleString()} ${unitType}`;
+          }
+          
+          const stockClass = locationQty > 0 ? 'text-success' : 'text-warning';
+          stockDisplay += `<div class="mb-1"><span class="${stockClass}">${location.location_name}:</span> ${locationStockDisplay}</div>`;
+        });
+        
+        // Add total summary
         if (unitType === 'boxes' && pcsPerBox > 0) {
-          const fullBoxes = Math.floor(totalPieces / pcsPerBox);
-          const remainingPieces = totalPieces % pcsPerBox;
-          stockDisplay = `${fullBoxes} boxes`;
+          const totalBoxes = Math.floor(totalStock / pcsPerBox);
+          const remainingPieces = totalStock % pcsPerBox;
+          stockDisplay += `<hr><strong>Total: ${totalBoxes} boxes`;
           if (remainingPieces > 0) {
             stockDisplay += ` + ${remainingPieces} pieces`;
           }
-          stockDisplay += ` (${totalPieces.toLocaleString()} total pieces)`;
-        } else if (unitType === 'pieces' && pcsPerBox > 0) {
-          const fullBoxes = Math.floor(totalPieces / pcsPerBox);
-          const remainingPieces = totalPieces % pcsPerBox;
-          stockDisplay = `${totalPieces.toLocaleString()} pieces`;
-          if (fullBoxes > 0) {
-            stockDisplay += ` (${fullBoxes} full boxes`;
-            if (remainingPieces > 0) {
-              stockDisplay += ` + ${remainingPieces} pieces`;
-            }
-            stockDisplay += ')';
-          }
+          stockDisplay += ` (${totalStock.toLocaleString()} total pieces)</strong>`;
         } else {
-          stockDisplay = `${totalPieces.toLocaleString()} ${unitType}`;
+          stockDisplay += `<hr><strong>Total: ${totalStock.toLocaleString()} ${unitType}</strong>`;
         }
         
-        currentStock.innerHTML = `
-          <strong>${product.name}</strong><br>
-          <span class="text-success">${locationStock.location_name}</span>: ${stockDisplay}
-        `;
+        currentStock.innerHTML = stockDisplay;
       } else if (product) {
-        currentStock.innerHTML = `
-          <strong>${product.name}</strong><br>
-          <span class="text-warning">No stock found for selected location</span>
-        `;
+        currentStock.innerHTML = `<strong>${product.name}</strong><br><span class="text-warning">No stock found in any location</span>`;
       } else {
         currentStock.textContent = "Product not found.";
       }
@@ -228,7 +237,16 @@
     btnSave.disabled = true;
     btnSave.textContent = "Saving...";
 
-    const res = await fetch(api("stock_in_record"), { method: "POST", body: fd });
+    const res = await fetch(api("stock_in"), { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_id: pid,
+        to_location_id: locId,
+        qty_base: qty,
+        note: n
+      })
+    });
     const j = await res.json();
 
     btnSave.disabled = false;

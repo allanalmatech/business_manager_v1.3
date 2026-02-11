@@ -32,14 +32,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $slug = trim($slug, '-');
         }
 
-        // Check if slug already exists
-        $check = $db->prepare("SELECT id FROM brands WHERE slug = ? LIMIT 1");
-        $check->bind_param('s', $slug);
+        // Check if slug already exists (including similar slugs with suffixes)
+        $check = $db->prepare("
+            SELECT id, slug FROM brands 
+            WHERE slug = ? OR slug LIKE ?
+            ORDER BY LENGTH(slug) DESC, slug ASC
+            LIMIT 5
+        ");
+        $slugPattern = $slug . '-%';
+        $check->bind_param('ss', $slug, $slugPattern);
         $check->execute();
-        if ($check->get_result()->num_rows > 0) {
-            $message = 'Brand with this slug already exists';
-            $message_type = 'danger';
-        } else {
+        $result = $check->get_result();
+        
+        if ($result->num_rows > 0) {
+            $existing_slugs = [];
+            while ($row = $result->fetch_assoc()) {
+                $existing_slugs[] = $row['slug'];
+            }
+            
+            // Check if any existing slug is exactly the same
+            if (in_array($slug, $existing_slugs)) {
+                $message = 'Brand with this slug already exists';
+                $message_type = 'danger';
+            } else {
+                // Insert brand
+                $insert = $db->prepare("INSERT INTO brands (name, slug, description, status) VALUES (?, ?, ?, ?)");
+                $insert->bind_param('ssss', $name, $slug, $description, $status);
+                
+                if ($insert->execute()) {
+                    $message = 'Brand created successfully';
+                    $message_type = 'success';
+                    
+                    // Log action
+                    if (function_exists('audit_log')) {
+                        audit_log('brands.create', 'brands', (string)$insert->insert_id, "Created brand: $name");
+                    }
+                    
+                    // Redirect to brands list
+                    header('Location: ' . $GLOBALS['BASE_URL'] . '/modules/brands/index.php');
+                    exit;
+                } else {
+                    $message = 'Error creating brand: ' . $db->error;
+                    $message_type = 'danger';
+                }
+            }
+        } else {    
             // Insert brand
             $insert = $db->prepare("INSERT INTO brands (name, slug, description, status) VALUES (?, ?, ?, ?)");
             $insert->bind_param('ssss', $name, $slug, $description, $status);
@@ -150,22 +187,86 @@ include __DIR__ . '/../../templates/layout/header.php';
 </div>
 
 <script>
+const BASE_URL = <?= json_encode($GLOBALS['BASE_URL'] ?? '') ?>;
+const currentBrandId = 0; // Create page has no existing ID
+
 function generateSlug() {
   const name = document.getElementById('name').value;
+  
   if (name.trim()) {
-    const slug = name.toLowerCase()
+    let slug = name.toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .trim('-');
+    
+    checkSlugExists(slug);
+  }
+}
+
+async function checkSlugExists(slug) {
+  try {
+    const response = await fetch(`${BASE_URL}/api/brands/check_slug.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        slug: slug,
+        exclude_id: currentBrandId
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.error) {
+      // Fallback to basic slug
+      document.getElementById('slug').value = slug;
+      return;
+    }
+    
+    if (result.exists) {
+      // Slug exists, add incrementing number
+      let finalSlug = slug;
+      let counter = 1;
+      
+      // Try up to 100 variations
+      while (counter <= 100) {
+        finalSlug = slug + '-' + counter.toString().padStart(3, '0');
+        
+        // Check if this specific slug is in the suggestions
+        if (!result.suggestions || !result.suggestions.includes(finalSlug)) {
+          break;
+        }
+        counter++;
+      }
+      
+      document.getElementById('slug').value = finalSlug;
+    } else {
+      document.getElementById('slug').value = slug;
+    }
+  } catch (error) {
+    // Fallback to basic slug generation
     document.getElementById('slug').value = slug;
   }
 }
 
-// Auto-generate slug when name changes
-document.getElementById('name').addEventListener('input', function() {
-  if (!document.getElementById('slug').value) {
-    generateSlug();
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', function() {
+  // Auto-generate slug when name changes
+  const nameField = document.getElementById('name');
+  if (nameField) {
+    nameField.addEventListener('input', function() {
+      generateSlug();
+    });
+  }
+  
+  // Manual slug generation - prevent auto-update when manually editing
+  const slugField = document.getElementById('slug');
+  if (slugField) {
+    slugField.addEventListener('input', function() {
+      this.dataset.manual = 'true';
+    });
   }
 });
 </script>

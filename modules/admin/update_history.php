@@ -7,6 +7,7 @@ require_once dirname(dirname(__DIR__)) . '/includes/auth.php';
 require_once dirname(dirname(__DIR__)) . '/includes/helpers.php';
 require_once dirname(dirname(__DIR__)) . '/includes/rbac.php';
 
+require_super_admin();
 require_permission('updates.view');
 
 $db = $GLOBALS['db'] ?? null;

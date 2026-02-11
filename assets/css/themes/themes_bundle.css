@@ -18,6 +18,17 @@
   --border-color: rgba(255,255,255,0.12);
 }
 
+/* Dark theme text contrast fixes */
+[data-theme="dark"] .text-dark {
+  color: #eaeaea !important;
+}
+[data-theme="dark"] .text-muted {
+  color: #bdbdbd !important;
+}
+[data-theme="dark"] .small.fw-bold.text-dark {
+  color: #ffffff !important;
+}
+
 
 /* Ocean Breeze */
 [data-theme="ocean"] {

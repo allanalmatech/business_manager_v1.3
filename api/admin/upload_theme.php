@@ -7,7 +7,7 @@ require_once dirname(dirname(__DIR__)) . '/includes/bootstrap.php';
 require_once dirname(dirname(__DIR__)) . '/includes/auth.php';
 require_once dirname(dirname(__DIR__)) . '/includes/rbac.php';
 
-if (!is_logged_in()) {
+if (!current_user()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
