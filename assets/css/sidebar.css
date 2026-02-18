@@ -29,8 +29,18 @@
 
 /* Fix for pop-out visibility: nav needs to allow overflow for the hovered item */
 body.sidebar-collapsed .app-sidebar__nav {
-  overflow-y: visible;
-  overflow-x: visible;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+body.sidebar-collapsed .app-sidebar__nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+body.sidebar-collapsed .app-sidebar__nav::-webkit-scrollbar-thumb {
+  background: var(--sidebar-icon-color);
+  border-radius: 10px;
+  opacity: 0.4;
 }
 
 /* ===== Base links ===== */
@@ -164,74 +174,47 @@ body.sidebar-collapsed .app-sidebar__nav .nav-link-group{
 }
 
 /* ===== Pop-out Submenus Logic ===== */
+body.sidebar-collapsed .nav-link-group {
+  overflow: visible;
+  position: relative;
+  z-index: 2;
+}
+
 body.sidebar-collapsed .nav-link-group .nav-sub {
   display: none !important; /* Hide default Bootstrap collapse */
 }
 
-body.sidebar-collapsed .nav-link-group:hover {
+/* ===== Collapsed sidebar hover wrapper fix ===== */
+body.sidebar-collapsed .nav-group-wrapper {
+  position: relative;
+  overflow: visible;
+}
+
+/* Keep button centered */
+body.sidebar-collapsed .nav-group-wrapper .nav-link-group {
+  justify-content: center;
+  padding: 12px 0;
+}
+
+/* Background highlight */
+body.sidebar-collapsed .nav-group-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 6px 8px;
+  border-radius: 10px;
+  background: transparent;
+  transition: background 0.2s ease;
+  z-index: 0;
+}
+
+body.sidebar-collapsed .nav-group-wrapper:hover::before {
   background: var(--sidebar-active-bg);
-  color: var(--sidebar-active-color);
 }
 
-/* The actual pop-out container */
-body.sidebar-collapsed .nav-link-group::after {
-  content: attr(data-title);
-  position: absolute;
-  left: 100%;
-  top: 0;
-  background: var(--sidebar-bg);
-  color: var(--sidebar-color);
-  padding: 12px 20px;
-  border-radius: 0 10px 10px 0;
-  box-shadow: 10px 0 20px rgba(0,0,0,0.1);
-  display: none;
-  white-space: nowrap;
-  font-weight: 600;
-  border: 1px solid var(--border-color);
-  border-left: none;
-  z-index: 1050;
-}
-
-body.sidebar-collapsed .nav-link-group:hover::after {
-  display: block;
-}
-
-/* Hovering over the group shows the submenu as a pop-out */
-body.sidebar-collapsed .nav-link-group:hover .nav-sub-popout {
-  display: block !important;
-  position: fixed; /* Use fixed to escape any overflow containers */
-  left: 80px;
-  background: var(--sidebar-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 0 12px 12px 12px;
-  box-shadow: 12px 5px 25px rgba(0,0,0,0.15);
-  z-index: 1060;
-  min-width: 220px;
-  padding: 10px;
-  margin: 0;
-}
-
-/* We'll use a hidden clone or JS to handle the popout positioning if needed, 
-   but for CSS-only we can try targeting the next sibling or nested div */
-   
-.nav-sub-popout {
-  display: none;
-}
-
-body.sidebar-collapsed .nav-link-group:hover + .nav-sub,
-body.sidebar-collapsed .nav-link-group:hover .nav-sub {
-  display: block !important;
-  position: absolute;
-  left: 100%;
-  top: 0;
-  margin: 0;
-  padding: 10px;
-  background: var(--sidebar-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 0 10px 10px 10px;
-  box-shadow: 10px 5px 20px rgba(0,0,0,0.1);
-  width: 240px;
-  z-index: 1060;
+/* Lift content above background */
+body.sidebar-collapsed .nav-group-wrapper > * {
+  position: relative;
+  z-index: 1;
 }
 
 body.sidebar-collapsed .nav-sub .nav-sublink {
@@ -241,15 +224,45 @@ body.sidebar-collapsed .nav-sub .nav-sublink {
   white-space: nowrap;
 }
 
+/*smooth scrolling inside submenus*/
+body.sidebar-collapsed .nav-sub {
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+  overflow-x: hidden;
+}
+
+/* ===== Collapsed pop-out submenu ===== */
+body.sidebar-collapsed .nav-group-wrapper:hover .nav-sub {
+  display: block !important;
+  position: fixed;               /* <-- KEY CHANGE (from absolute) */
+  left: 80px;                    /* Sidebar collapsed width */
+  top: auto;
+  bottom: auto;
+
+  max-height: calc(100vh - 20px); /* Always stay in viewport */
+  overflow-y: auto;              /* Scroll if too tall */
+
+  margin: 0;
+  padding: 10px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0 12px 12px 12px;
+  box-shadow: 12px 5px 25px rgba(0,0,0,0.15);
+  width: 240px;
+  z-index: 2000;
+}
+
 /* ===== Theme-Aware Contrast Adjustments ===== */
 /* Light themes */
 [data-theme="default"], [data-theme="sunset"], [data-theme="rose"], [data-theme="ocean"] {
   --sidebar-text-muted: rgba(0, 0, 0, 0.5);
+  --sidebar-icon-color: rgba(0, 0, 0, 0.75);
 }
 
 /* Dark themes */
 [data-theme="dark"], [data-theme="slate"], [data-theme="coffee"], [data-theme="cyber"], [data-theme="forest"], [data-theme="royal"] {
   --sidebar-text-muted: rgba(255, 255, 255, 0.5);
+  --sidebar-icon-color: rgba(255, 255, 255, 0.85);
   --border-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -262,9 +275,11 @@ body.sidebar-collapsed .nav-sub .nav-sublink {
 }
 
 /* Ensure icons have good contrast */
-.nav-link i, .nav-link-group i {
-  color: inherit;
-  opacity: 0.8;
+.nav-link i,
+.nav-link-group i,
+.nav-sublink i {
+  color: var(--sidebar-icon-color);
+  opacity: 1;
 }
 
 .nav-link:hover i, .nav-link-group:hover i {

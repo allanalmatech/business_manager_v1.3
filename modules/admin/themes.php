@@ -125,6 +125,7 @@ async function setTheme(themeId) {
     const fd = new FormData();
     fd.append('key', 'app_theme');
     fd.append('value', themeId);
+    fd.append('csrf', '<?= $_SESSION['csrf'] ?? '' ?>');
     
     try {
         const res = await fetch('<?= $BASE_URL ?>/api/settings/upsert.php', {

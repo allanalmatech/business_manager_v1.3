@@ -119,4 +119,27 @@
       trigger: 'hover'
     });
   });
+
+  //intelligent vertical positioning for submenus
+  document.addEventListener('mouseover', e => {
+    const wrapper = e.target.closest('.nav-group-wrapper');
+    if (!wrapper || !document.body.classList.contains('sidebar-collapsed')) return;
+
+    const submenu = wrapper.querySelector('.nav-sub');
+    if (!submenu) return;
+
+    const rect = wrapper.getBoundingClientRect();
+    const submenuHeight = submenu.offsetHeight;
+    const viewportHeight = window.innerHeight;
+
+    // Default: align top with hovered item
+    let top = rect.top;
+
+    // If submenu would overflow bottom, shift it up
+    if (top + submenuHeight > viewportHeight - 10) {
+      top = Math.max(10, viewportHeight - submenuHeight - 10);
+    }
+
+    submenu.style.top = `${top}px`;
+  });
 })();

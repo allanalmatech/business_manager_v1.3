@@ -12,23 +12,62 @@ function has_permission(string $perm): bool {
 }
 
 // Helper to render a group as collapsible if >2 items
+// function sidebar_group(string $id, string $icon, string $title, array $items, string $baseUrl): void {
+//     $count = count($items);
+
+//     // If 2 or fewer items, render as normal links (not collapsible)
+//     if ($count <= 2) {
+//         echo '<div class="nav-section text-uppercase small px-2 mt-3">'.htmlspecialchars($title).'</div>';
+//         foreach ($items as $it) {
+//             echo '<a class="nav-link" href="'.htmlspecialchars($baseUrl.$it['href']).'" data-bs-toggle="tooltip" data-bs-placement="right" title="'.htmlspecialchars($it['label']).'">'.$it['icon'].' <span class="nav-text">'.htmlspecialchars($it['label']).'</span></a>';
+//         }
+//         return;
+//     }
+
+//     // Collapsible group
+//     $collapseId = 'collapse_' . $id;
+//     echo '<div class="nav-section text-uppercase small px-2 mt-3">'.htmlspecialchars($title).'</div>';
+
+//     echo '<button class="nav-link nav-link-group" type="button" data-bs-toggle="collapse" data-bs-target="#'.$collapseId.'" aria-expanded="false" aria-controls="'.$collapseId.'" data-title="'.htmlspecialchars($title).'">';
+//     echo '<span class="nav-ico">'.$icon.'</span>';
+//     echo '<span class="nav-text">'.htmlspecialchars($title).'</span>';
+//     echo '<span class="ms-auto nav-caret">▾</span>';
+//     echo '</button>';
+
+//     echo '<div class="collapse nav-sub" id="'.$collapseId.'">';
+//     foreach ($items as $it) {
+//         echo '<a class="nav-sublink" href="'.htmlspecialchars($baseUrl.$it['href']).'">'.$it['icon'].' '.htmlspecialchars($it['label']).'</a>';
+//     }
+//     echo '</div>';
+// }
 function sidebar_group(string $id, string $icon, string $title, array $items, string $baseUrl): void {
     $count = count($items);
 
-    // If 2 or fewer items, render as normal links (not collapsible)
+    // If 2 or fewer items, render as normal links
     if ($count <= 2) {
         echo '<div class="nav-section text-uppercase small px-2 mt-3">'.htmlspecialchars($title).'</div>';
         foreach ($items as $it) {
-            echo '<a class="nav-link" href="'.htmlspecialchars($baseUrl.$it['href']).'" data-bs-toggle="tooltip" data-bs-placement="right" title="'.htmlspecialchars($it['label']).'">'.$it['icon'].' <span class="nav-text">'.htmlspecialchars($it['label']).'</span></a>';
+            echo '<a class="nav-link" href="'.htmlspecialchars($baseUrl.$it['href']).'">'
+               . $it['icon'].' <span class="nav-text">'.htmlspecialchars($it['label']).'</span></a>';
         }
         return;
     }
 
-    // Collapsible group
     $collapseId = 'collapse_' . $id;
+
     echo '<div class="nav-section text-uppercase small px-2 mt-3">'.htmlspecialchars($title).'</div>';
 
-    echo '<button class="nav-link nav-link-group" type="button" data-bs-toggle="collapse" data-bs-target="#'.$collapseId.'" aria-expanded="false" aria-controls="'.$collapseId.'" data-title="'.htmlspecialchars($title).'">';
+    // 👇 NEW WRAPPER
+    echo '<div class="nav-group-wrapper">';
+
+    echo '<button class="nav-link nav-link-group"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#'.$collapseId.'"
+                aria-expanded="false"
+                aria-controls="'.$collapseId.'"
+                data-title="'.htmlspecialchars($title).'">';
+
     echo '<span class="nav-ico">'.$icon.'</span>';
     echo '<span class="nav-text">'.htmlspecialchars($title).'</span>';
     echo '<span class="ms-auto nav-caret">▾</span>';
@@ -36,9 +75,12 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
 
     echo '<div class="collapse nav-sub" id="'.$collapseId.'">';
     foreach ($items as $it) {
-        echo '<a class="nav-sublink" href="'.htmlspecialchars($baseUrl.$it['href']).'">'.$it['icon'].' '.htmlspecialchars($it['label']).'</a>';
+        echo '<a class="nav-sublink" href="'.htmlspecialchars($baseUrl.$it['href']).'">'
+           . $it['icon'].' '.htmlspecialchars($it['label']).'</a>';
     }
     echo '</div>';
+
+    echo '</div>'; // END wrapper
 }
 ?>
 
@@ -58,7 +100,7 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
 
     <a class="nav-link" href="<?= htmlspecialchars($BASE_URL) ?>/index.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
       <i class="bi bi-speedometer2"></i> <span class="nav-text">Dashboard</span>
-    </a>
+    </a> 
 
     <?php if (has_permission('pos.create') || has_permission('pos.use') || has_permission('pos.view')): ?>
       <?php 

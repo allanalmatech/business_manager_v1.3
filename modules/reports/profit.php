@@ -185,9 +185,9 @@ require_once __DIR__ . '/../../templates/layout/header.php';
             </div>
           </div>
           <div class="col-md-4 mb-3">
-            <div class="card border-0 bg-primary bg-opacity-10">
+            <div class="card border-0 bg-theme-primary-soft">
               <div class="card-body text-center">
-                <div class="fs-2 fw-bold text-primary"><?= h(number_format($totals['gross_profit'],2)) ?></div>
+                <div class="fs-2 fw-bold text-theme-primary"><?= h(number_format($totals['gross_profit'],2)) ?></div>
                 <div class="small text-muted">Gross Profit</div>
               </div>
             </div>

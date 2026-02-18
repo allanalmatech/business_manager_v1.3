@@ -26,23 +26,6 @@ function table_exists(mysqli $db, string $name): bool {
   return ($r && $r->num_rows > 0);
 }
 
-function ensure_templates_table(mysqli $db): void {
-  if (table_exists($db, 'message_templates')) return;
-  $sql = "
-    CREATE TABLE IF NOT EXISTS message_templates (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      subject VARCHAR(255),
-      message TEXT NOT NULL,
-      category VARCHAR(100) DEFAULT 'general',
-      created_by INT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY unique_name (name)
-    )
-  ";
-  $db->query($sql);
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
@@ -51,8 +34,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors[] = 'Invalid request. Please try again.';
   } else {
     try {
-      if (!($db instanceof mysqli)) throw new Exception('DB unavailable.');
-      ensure_templates_table($db);
 
       if ($action === 'cancel_edit') {
         header("Location: {$BASE}/modules/messaging/templates.php");
@@ -82,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($errors)) {
           if ($action === 'create') {
             $stmt = $db->prepare("INSERT INTO message_templates (name, subject, message, category, created_by) VALUES (?, ?, ?, ?, ?)");
-            $uid = (int)($_SESSION['user_id'] ?? 0);
+            $uid = (int)($_SESSION['user']['id'] ?? 0);
             $stmt->bind_param('ssssi', $name, $subject, $message, $category, $uid);
             if (!$stmt->execute()) $errors[] = 'Failed to create template.';
             else $success = 'Template created successfully!';

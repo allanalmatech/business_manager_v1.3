@@ -144,3 +144,10 @@
   --muted-color: #6b7280;
   --primary-hover: color-mix(in srgb, var(--primary-color) 85%, #000);
 }
+
+.text-theme-primary {
+  color: var(--primary-color) !important;
+}
+.bg-theme-primary-soft {
+  background-color: color-mix(in srgb, var(--primary-color) 10%, transparent);
+}
