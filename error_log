@@ -1,0 +1,5 @@
+[11-Feb-2026 17:47:11 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function str_starts_with() in /home3/almatech/public_html/projects/business_manager_v1.2/templates/layout/header.php:44
+Stack trace:
+#0 /home3/almatech/public_html/projects/business_manager_v1.2/index.php(29): require_once()
+#1 {main}
+  thrown in /home3/almatech/public_html/projects/business_manager_v1.2/templates/layout/header.php on line 44

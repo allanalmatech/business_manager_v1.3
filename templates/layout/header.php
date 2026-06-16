@@ -40,10 +40,15 @@ $BASE_URL = $GLOBALS['BASE_URL'] ?? '';
         }
     }
     
-    // Load custom theme if it exists
-    if (str_starts_with($current_theme, 'custom_')) {
-        echo '<link rel="stylesheet" href="' . htmlspecialchars($BASE_URL) . '/assets/css/themes/' . htmlspecialchars($current_theme) . '.css">';
-    }
+// Load custom theme if it exists
+if (strpos($current_theme, 'custom_') === 0) {
+    echo '<link rel="stylesheet" href="' 
+        . htmlspecialchars($BASE_URL) 
+        . '/assets/css/themes/' 
+        . htmlspecialchars($current_theme) 
+        . '.css">';
+}
+
   ?>
   <script>
     document.documentElement.setAttribute('data-theme', '<?= htmlspecialchars($current_theme) ?>');

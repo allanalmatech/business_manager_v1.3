@@ -2,44 +2,63 @@
 // includes/session_db.php
 declare(strict_types=1);
 
+
 final class DbSessionHandler implements SessionHandlerInterface
 {
-    private mysqli $db;
-    private int $ttl;
+    /** @var mysqli */
+    private $db;
 
-    public function __construct(mysqli $db, int $ttlSeconds = 7200)
+    /** @var int */
+    private $ttl;
+
+    public function __construct(mysqli $db, $ttlSeconds = 7200)
     {
         $this->db  = $db;
-        $this->ttl = $ttlSeconds;
+        $this->ttl = (int)$ttlSeconds;
     }
 
-    public function open(string $savePath, string $sessionName): bool { return true; }
-    public function close(): bool { return true; }
+    public function open($savePath, $sessionName)
+    {
+        return true;
+    }
 
-    public function read(string $id): string|false
+    public function close()
+    {
+        return true;
+    }
+
+    public function read($id)
     {
         $now = time();
         $min = $now - $this->ttl;
 
         $stmt = $this->db->prepare("SELECT data FROM sessions WHERE id=? AND last_activity >= ? LIMIT 1");
+        if (!$stmt) return '';
+
         $stmt->bind_param("si", $id, $min);
         $stmt->execute();
-        $res = $stmt->get_result()->fetch_assoc();
+
+        $res = $stmt->get_result();
+        $row = $res ? $res->fetch_assoc() : null;
         $stmt->close();
 
-        if (!$res) return '';
-        return (string)$res['data'];
+        if (!$row) return '';
+        return (string)$row['data'];
     }
 
-    public function write(string $id, string $data): bool
+    public function write($id, $data)
     {
         $now = time();
-        $ip  = $_SERVER['REMOTE_ADDR'] ?? null;
-        $ua  = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
+        $ip  = isset($_SERVER['REMOTE_ADDR']) ? (string)$_SERVER['REMOTE_ADDR'] : '';
+        $ua  = isset($_SERVER['HTTP_USER_AGENT']) ? substr((string)$_SERVER['HTTP_USER_AGENT'], 0, 255) : '';
 
-        $userId = $_SESSION['user']['id'] ?? null;
+        // IMPORTANT: session might not be started yet when write() is first called
+        $userId = null;
+        if (isset($_SESSION) && isset($_SESSION['user']) && isset($_SESSION['user']['id'])) {
+            $userId = (int)$_SESSION['user']['id'];
+        }
 
-        $stmt = $this->db->prepare("
+        $sql = "
             INSERT INTO sessions (id, user_id, data, ip_address, user_agent, last_activity)
             VALUES (?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -48,34 +67,65 @@ final class DbSessionHandler implements SessionHandlerInterface
               ip_address=VALUES(ip_address),
               user_agent=VALUES(user_agent),
               last_activity=VALUES(last_activity)
-        ");
-        // bind_param needs explicit types. user_id can be null => use i but pass null ok with mysqlnd.
-        $stmt->bind_param("sisssi", $id, $userId, $data, $ip, $ua, $now);
+        ";
+
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) return false;
+
+        // If userId is null, bind 0 and store NULL using NULLIF in SQL OR set it to NULL via separate query.
+        // Easiest: store NULL by converting 0 to NULL in SQL using NULLIF(?,0)
+        // We'll do it safely by adjusting SQL when $userId is null.
+        if ($userId === null) {
+            $sql2 = "
+                INSERT INTO sessions (id, user_id, data, ip_address, user_agent, last_activity)
+                VALUES (?, NULL, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                  user_id=NULL,
+                  data=VALUES(data),
+                  ip_address=VALUES(ip_address),
+                  user_agent=VALUES(user_agent),
+                  last_activity=VALUES(last_activity)
+            ";
+            $stmt->close();
+            $stmt = $this->db->prepare($sql2);
+            if (!$stmt) return false;
+
+            $stmt->bind_param("ssssi", $id, $data, $ip, $ua, $now);
+        } else {
+            $stmt->bind_param("sisssi", $id, $userId, $data, $ip, $ua, $now);
+        }
+
         $ok = $stmt->execute();
         $stmt->close();
 
         return (bool)$ok;
     }
 
-    public function destroy(string $id): bool
+    public function destroy($id)
     {
         $stmt = $this->db->prepare("DELETE FROM sessions WHERE id=?");
+        if (!$stmt) return false;
+
         $stmt->bind_param("s", $id);
         $ok = $stmt->execute();
         $stmt->close();
+
         return (bool)$ok;
     }
 
-    public function gc(int $max_lifetime): int|false
+    public function gc($max_lifetime)
     {
         $now = time();
         $min = $now - $this->ttl;
 
         $stmt = $this->db->prepare("DELETE FROM sessions WHERE last_activity < ?");
+        if (!$stmt) return 0;
+
         $stmt->bind_param("i", $min);
         $stmt->execute();
-        $count = $stmt->affected_rows;
+        $count = (int)$stmt->affected_rows;
         $stmt->close();
+
         return $count;
     }
 }

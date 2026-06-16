@@ -2,8 +2,8 @@
 // config/app.php
 
 return [
-    'app_name'     => 'Business Manager',
-    'app_version'  => '1.0.0',
+    'app_name'     => 'Business Manager Pro',
+    'app_version'  => '1.2',
     'timezone'     => 'Africa/Kampala',
 
     'base_url'     => '', // auto-detect if empty

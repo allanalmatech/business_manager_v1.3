@@ -2,41 +2,69 @@
 // includes/bootstrap.php
 declare(strict_types=1);
 
-// Suppress errors for API endpoints
-if (str_contains($_SERVER['REQUEST_URI'], '_api.php')) {
+
+/**
+ * PHP 7 compatible bootstrap.
+ * - No str_contains()
+ * - Guards missing server vars
+ * - Avoids parse errors by complete structure
+ */
+
+// Suppress errors for API endpoints (PHP 7 compatible)
+$reqUri = isset($_SERVER['REQUEST_URI']) ? (string)$_SERVER['REQUEST_URI'] : '';
+if ($reqUri !== '' && strpos($reqUri, '_api.php') !== false) {
     ini_set('display_errors', '0');
 }
 
-require_once __DIR__ . '/../config/db.php';
-
-$dbCfg = require __DIR__ . '/../config/db.php';
+// Load configs (make sure these files RETURN arrays)
+$dbCfg  = require __DIR__ . '/../config/db.php';
 $appCfg = require __DIR__ . '/../config/app.php';
 
 // Define app version constant
-define('APP_VERSION', $appCfg['app_version']);
+if (!defined('APP_VERSION')) {
+    define('APP_VERSION', isset($appCfg['app_version']) ? (string)$appCfg['app_version'] : '1.0.0');
+}
 
-$mysqli = new mysqli($dbCfg['host'], $dbCfg['username'], $dbCfg['password'], $dbCfg['database']);
+// Connect DB
+$mysqli = new mysqli(
+    (string)$dbCfg['host'],
+    (string)$dbCfg['username'],
+    (string)$dbCfg['password'],
+    (string)$dbCfg['database']
+);
+
 if ($mysqli->connect_error) {
     http_response_code(500);
     die('Database connection failed.');
 }
-$mysqli->set_charset($dbCfg['charset']);
+
+$charset = isset($dbCfg['charset']) ? (string)$dbCfg['charset'] : 'utf8mb4';
+$mysqli->set_charset($charset);
 
 // Secure session settings
 ini_set('session.use_strict_mode', '1');
 ini_set('session.cookie_httponly', '1');
 ini_set('session.cookie_samesite', 'Lax');
 // If HTTPS later, set to 1:
-ini_set('session.cookie_secure', isset($_SERVER['HTTPS']) ? '1' : '0');
+ini_set('session.cookie_secure', (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? '1' : '0');
 
-require_once __DIR__ . '/session_db.php';
-$handler = new DbSessionHandler($mysqli, 60 * 60 * 2); // 2h
-session_set_save_handler($handler, true);
+// DB session handler (optional)
+$sessionHandlerFile = __DIR__ . '/session_db.php';
+if (is_file($sessionHandlerFile)) {
+    require_once $sessionHandlerFile;
 
-session_name('BMSESSID');
-session_start();
+    if (class_exists('DbSessionHandler')) {
+        $handler = new DbSessionHandler($mysqli, 60 * 60 * 2); // 2h
+        session_set_save_handler($handler, true);
+    }
+}
 
-// Simple CSRF token seed (you’ll expand later)
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_name('BMSESSID');
+    session_start();
+}
+
+// CSRF token seed
 if (empty($_SESSION['csrf'])) {
     $_SESSION['csrf'] = bin2hex(random_bytes(32));
 }
@@ -46,19 +74,27 @@ $GLOBALS['db'] = $mysqli;
 
 // Base URL for assets/links (subfolder safe)
 $BASE_URL = '';
-$docRoot = realpath((string)($_SERVER['DOCUMENT_ROOT'] ?? '')) ?: '';
-$projRoot = realpath(__DIR__ . '/..') ?: '';
-if ($docRoot !== '' && $projRoot !== '') {
+
+$docRoot = isset($_SERVER['DOCUMENT_ROOT']) ? realpath((string)$_SERVER['DOCUMENT_ROOT']) : '';
+$projRoot = realpath(__DIR__ . '/..');
+
+if ($docRoot && $projRoot) {
     $docRootN = str_replace('\\', '/', rtrim($docRoot, "\\/"));
     $projRootN = str_replace('\\', '/', rtrim($projRoot, "\\/"));
+
     if (stripos($projRootN, $docRootN) === 0) {
         $rel = substr($projRootN, strlen($docRootN));
         $rel = '/' . ltrim((string)$rel, '/');
         $BASE_URL = rtrim($rel, '/');
     }
 }
+
 if ($BASE_URL === '') {
-    $BASE_URL = rtrim(dirname((string)($_SERVER['SCRIPT_NAME'] ?? '')), '/\\');
-    if ($BASE_URL === '/' || $BASE_URL === '\\') $BASE_URL = '';
+    $scriptName = isset($_SERVER['SCRIPT_NAME']) ? (string)$_SERVER['SCRIPT_NAME'] : '';
+    $BASE_URL = rtrim(dirname($scriptName), '/\\');
+    if ($BASE_URL === '/' || $BASE_URL === '\\') {
+        $BASE_URL = '';
+    }
 }
+
 $GLOBALS['BASE_URL'] = $BASE_URL;

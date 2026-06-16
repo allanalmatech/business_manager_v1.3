@@ -1,0 +1,21 @@
+User-agent: *
+Disallow: /api/
+Disallow: /config/
+Disallow: /cron/
+Disallow: /dashboards/
+Disallow: /docs/
+Disallow: /includes/
+Disallow: /migrations/
+Disallow: /modules/
+Disallow: /setup/
+Disallow: /sql/
+Disallow: /storage/
+Disallow: /templates/
+Disallow: /uploads/
+Disallow: /run_migration.php
+Disallow: /forgot_password.php
+Disallow: /reset_password.php
+
+Allow: /index.php
+Allow: /login.php
+

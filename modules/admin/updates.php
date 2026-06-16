@@ -47,11 +47,11 @@ $currentVersion = defined('APP_VERSION') ? (string)APP_VERSION : '1.0.0';
             <div class="mt-3">
               <pre class="bg-light border rounded p-2 small mb-0" id="logBox">Ready.</pre>
             </div>
-
+<!--
             <div class="small text-muted mt-2">
               This page expects API endpoints:
               <b>api/updates/check.php</b> and <b>api/updates/apply.php</b>.
-            </div>
+            </div> -->
           </div>
         </div>
       </div>
