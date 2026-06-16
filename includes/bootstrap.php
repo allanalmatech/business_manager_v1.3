@@ -45,17 +45,56 @@ $mysqli->set_charset($charset);
 ini_set('session.use_strict_mode', '1');
 ini_set('session.cookie_httponly', '1');
 ini_set('session.cookie_samesite', 'Lax');
-// If HTTPS later, set to 1:
-ini_set('session.cookie_secure', (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? '1' : '0');
+
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+if (!$isHttps && !empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+    $isHttps = (strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+}
+ini_set('session.cookie_secure', $isHttps ? '1' : '0');
+
+function bootstrap_can_use_db_sessions(mysqli $mysqli): bool
+{
+    $tableCheck = $mysqli->query("SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sessions' LIMIT 1");
+    if (!$tableCheck || $tableCheck->num_rows < 1) {
+        return false;
+    }
+
+    $probeId = '__session_probe_' . bin2hex(random_bytes(8));
+    $now = time();
+    $stmt = $mysqli->prepare("INSERT INTO sessions (id, user_id, data, ip_address, user_agent, last_activity) VALUES (?, NULL, '', '', '', ?)");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param('si', $probeId, $now);
+    $ok = $stmt->execute();
+    $stmt->close();
+
+    if (!$ok) {
+        return false;
+    }
+
+    $stmt = $mysqli->prepare("DELETE FROM sessions WHERE id = ?");
+    if ($stmt) {
+        $stmt->bind_param('s', $probeId);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    return true;
+}
 
 // DB session handler (optional)
+$sessionBackend = 'php';
 $sessionHandlerFile = __DIR__ . '/session_db.php';
 if (is_file($sessionHandlerFile)) {
     require_once $sessionHandlerFile;
 
-    if (class_exists('DbSessionHandler')) {
+    if (class_exists('DbSessionHandler') && bootstrap_can_use_db_sessions($mysqli)) {
         $handler = new DbSessionHandler($mysqli, 60 * 60 * 2); // 2h
-        session_set_save_handler($handler, true);
+        if (session_set_save_handler($handler, true)) {
+            $sessionBackend = 'database';
+        }
     }
 }
 
@@ -71,6 +110,7 @@ if (empty($_SESSION['csrf'])) {
 
 // Make DB accessible
 $GLOBALS['db'] = $mysqli;
+$GLOBALS['SESSION_BACKEND'] = $sessionBackend;
 
 // Base URL for assets/links (subfolder safe)
 $BASE_URL = '';
