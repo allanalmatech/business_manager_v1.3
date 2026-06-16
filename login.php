@@ -8,6 +8,9 @@ require_once __DIR__ . '/includes/audit.php';
 $BASE_URL = $GLOBALS['BASE_URL'] ?? '';
 
 $error = '';
+$notice = isset($_GET['database_emptied'])
+    ? 'Database was emptied successfully. Re-run setup or restore a backup before signing in.'
+    : '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf = $_POST['csrf'] ?? '';
@@ -259,6 +262,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   </div>
                 <?php endif; ?>
 
+                <?php if ($notice): ?>
+                  <div class="alert alert-warning d-flex align-items-start gap-2">
+                    <i class="bi bi-info-circle mt-1"></i>
+                    <div><?= htmlspecialchars($notice) ?></div>
+                  </div>
+                <?php endif; ?>
+
                 <form method="post" autocomplete="on">
                   <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['csrf'] ?? '') ?>">
 
@@ -328,11 +338,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   <div class="demo-row">
                     <div>
                       <div class="demo-k">Accountant</div>
-                      <div class="demo-v" data-copy="manager1">accountant1</div>
+                      <div class="demo-v" data-copy="accountant1">accountant1</div>
                       <div class="demo-k">Password: <span class="demo-v" data-copy="Accountant1@123">Accountant1@123</span></div>
                     </div>
                     <button class="btn btn-sm btn-outline-primary copy-btn" type="button"
-                      data-copy-btn data-u="accountant1" data-p="Accountant@123">
+                      data-copy-btn data-u="accountant1" data-p="Accountant1@123">
                       <i class="fa-solid fa-paste"></i>
                     </button>
                   </div>

@@ -216,6 +216,7 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
         ['href'=>'/modules/admin/permissions.php','label'=>'Permissions','icon'=>'<i class="bi bi-key"></i>'],
         ['href'=>'/modules/admin/approvals.php','label'=>'Approvals','icon'=>'<i class="bi bi-check-circle"></i>'],
         ['href'=>'/modules/admin/audit_trail.php','label'=>'Audit Trail','icon'=>'<i class="bi bi-journal-text"></i>'],
+        ['href'=>'/modules/admin/database_reset.php','label'=>'Database Reset','icon'=>'<i class="bi bi-database-x"></i>'],
         ['href'=>'/modules/admin/updates.php','label'=>'Updates','icon'=>'<i class="bi bi-cloud-arrow-up"></i>'],
         ['href'=>'/modules/admin/update_history.php','label'=>'History','icon'=>'<i class="bi bi-clock-history"></i>'],
       ], $BASE_URL); ?>
