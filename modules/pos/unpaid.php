@@ -94,7 +94,8 @@ if ($to !== '') {
 }
 
 // Customer join (if customers table exists)
-$hasCustomers = $db->query("SHOW TABLES LIKE 'customers'")?->num_rows ?? 0;
+$tmpCust = $db->query("SHOW TABLES LIKE 'customers'");
+$hasCustomers = ($tmpCust && isset($tmpCust->num_rows)) ? $tmpCust->num_rows : 0;
 $customerSelect = $hasCustomers ? ", c.name AS customer_name" : ", NULL AS customer_name";
 $customerJoin = $hasCustomers ? " LEFT JOIN customers c ON c.id = s.customer_id" : "";
 
@@ -156,7 +157,8 @@ $st->close();
 
 // ---- locations for filter ----
 $locations = [];
-$hasLoc = $db->query("SHOW TABLES LIKE 'selling_locations'")?->num_rows ?? 0;
+$tmpLoc = $db->query("SHOW TABLES LIKE 'selling_locations'");
+$hasLoc = ($tmpLoc && isset($tmpLoc->num_rows)) ? $tmpLoc->num_rows : 0;
 if ($hasLoc) {
   $lr = $db->query("SELECT id, name FROM selling_locations ORDER BY name ASC");
   if ($lr) while ($x = $lr->fetch_assoc()) $locations[] = $x;

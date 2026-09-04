@@ -155,6 +155,7 @@ function seed_create_core_tables(mysqli $db): void {
           `value` TEXT NULL,
           `group` VARCHAR(50) NULL,
           `type` VARCHAR(30) NOT NULL DEFAULT 'text',
+          `options` TEXT NULL,
           description VARCHAR(255) NULL,
           sort_order INT NOT NULL DEFAULT 0,
           updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -221,10 +222,11 @@ function seed_user(mysqli $db, int $roleId, string $username, string $fullName, 
     $stmt->close();
 }
 
-function seed_setting(mysqli $db, string $key, string $value, string $group, string $type, string $description, int $sortOrder): void {
+function seed_setting(mysqli $db, string $key, string $value, string $group, string $type, string $description, int $sortOrder, string $options = ''): void {
     $hasGrouping = seed_column_exists($db, 'settings', 'group')
         && seed_column_exists($db, 'settings', 'type')
         && seed_column_exists($db, 'settings', 'sort_order');
+    $hasOptions = seed_column_exists($db, 'settings', 'options');
 
     if (!$hasGrouping) {
         $stmt = seed_prepare($db, "
@@ -240,19 +242,36 @@ function seed_setting(mysqli $db, string $key, string $value, string $group, str
         return;
     }
 
-    $stmt = seed_prepare($db, "
-        INSERT INTO settings (`key`, `value`, `group`, `type`, description, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          `value` = VALUES(`value`),
-          `group` = VALUES(`group`),
-          `type` = VALUES(`type`),
-          description = VALUES(description),
-          sort_order = VALUES(sort_order)
-    ");
-    $stmt->bind_param('sssssi', $key, $value, $group, $type, $description, $sortOrder);
-    $stmt->execute();
-    $stmt->close();
+    if ($hasOptions) {
+        $stmt = seed_prepare($db, "
+            INSERT INTO settings (`key`, `value`, `group`, `type`, description, sort_order, `options`)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+              `value` = VALUES(`value`),
+              `group` = VALUES(`group`),
+              `type` = VALUES(`type`),
+              description = VALUES(description),
+              sort_order = VALUES(sort_order),
+              `options` = VALUES(`options`)
+        ");
+        $stmt->bind_param('sssssis', $key, $value, $group, $type, $description, $sortOrder, $options);
+        $stmt->execute();
+        $stmt->close();
+    } else {
+        $stmt = seed_prepare($db, "
+            INSERT INTO settings (`key`, `value`, `group`, `type`, description, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+              `value` = VALUES(`value`),
+              `group` = VALUES(`group`),
+              `type` = VALUES(`type`),
+              description = VALUES(description),
+              sort_order = VALUES(sort_order)
+        ");
+        $stmt->bind_param('sssssi', $key, $value, $group, $type, $description, $sortOrder);
+        $stmt->execute();
+        $stmt->close();
+    }
 }
 
 function seed_database(mysqli $db): void {
@@ -393,10 +412,10 @@ function seed_database(mysqli $db): void {
     seed_user($db, $roles['accountant'], 'accountant1', 'Accountant', 'Accountant1@123');
     seed_log('Demo users seeded.');
 
-    seed_setting($db, 'app_theme', 'default', 'General', 'text', 'Active UI theme', 10);
-    seed_setting($db, 'currency_symbol', 'UGX ', 'Business', 'text', 'Currency symbol', 20);
-    seed_setting($db, 'currency_code', 'UGX', 'Business', 'text', 'Currency code', 30);
-    seed_setting($db, 'decimal_places', '0', 'Business', 'text', 'Currency decimal places', 40);
+    seed_setting($db, 'app_theme', 'default', 'General', 'select', 'Active UI theme', 10, '["default","dark","ocean","forest","sunset","royal","slate","rose","coffee","cyber"]');
+    seed_setting($db, 'currency_symbol', 'UGX ', 'Business', 'select', 'Currency symbol', 20, '["$","€","£","UGX","KES","NGN","GHS","ZAR","INR","¥","₹","R","Fr","₡","₱"]');
+    seed_setting($db, 'currency_code', 'UGX', 'Business', 'select', 'Currency code', 30, '["USD","EUR","GBP","UGX","KES","NGN","GHS","ZAR","INR","JPY","CNY","CAD","AUD","CHF"]');
+    seed_setting($db, 'decimal_places', '0', 'Business', 'select', 'Currency decimal places', 40, '["0","1","2","3"]');
     seed_log('Default settings seeded.');
 }
 

@@ -270,7 +270,8 @@ if ($hasReturnsTable) {
       $types .= "s";
     }
 
-    $hasCustomers = $db->query("SHOW TABLES LIKE 'customers'")?->num_rows ?? 0;
+    $tmpCust = $db->query("SHOW TABLES LIKE 'customers'");
+$hasCustomers = ($tmpCust && isset($tmpCust->num_rows)) ? $tmpCust->num_rows : 0;
     $customerSelect = $hasCustomers ? ", c.name AS customer_name" : ", NULL AS customer_name";
     $customerJoin = $hasCustomers ? " LEFT JOIN customers c ON c.id = s.customer_id" : "";
 

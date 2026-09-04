@@ -161,6 +161,7 @@ CREATE TABLE `settings` (
   `key` varchar(100) NOT NULL,
   `group` varchar(60) NOT NULL DEFAULT 'General',
   `type` varchar(20) NOT NULL DEFAULT 'text',
+  `options` text DEFAULT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `value` text DEFAULT NULL,
   `description` varchar(255) DEFAULT NULL,

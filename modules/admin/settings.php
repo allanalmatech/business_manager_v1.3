@@ -40,14 +40,21 @@ if ($db instanceof mysqli) {
   if ($rsCols) {
     while ($c = $rsCols->fetch_assoc()) $cols[] = $c['Field'];
   }
+  // Ensure options column exists (for select dropdowns)
+  if ($db instanceof mysqli && !in_array('options', $cols, true)) {
+    $db->query("ALTER TABLE settings ADD COLUMN `options` TEXT NULL AFTER `type`");
+    $cols[] = 'options';
+  }
   $hasGrouping = in_array('group', $cols, true) && in_array('type', $cols, true);
 
   if ($hasGrouping) {
-    $rs = $db->query("SELECT `group`, `key`, `value`, `type`, `description`, updated_at, sort_order
+    $hasOptsCol = in_array('options', $cols, true);
+    $optSelect = $hasOptsCol ? ', `options`' : ", NULL AS `options`";
+    $rs = $db->query("SELECT `group`, `key`, `value`, `type`, `description`, updated_at, sort_order$optSelect
                       FROM settings ORDER BY `group` ASC, sort_order ASC, `key` ASC");
     $rows = $rs ? $rs->fetch_all(MYSQLI_ASSOC) : [];
   } else {
-    $rs = $db->query("SELECT `key`, `value`, `description`, updated_at FROM settings ORDER BY `key` ASC");
+    $rs = $db->query("SELECT `key`, `value`, `description`, updated_at, NULL AS `options` FROM settings ORDER BY `key` ASC");
     $rows = $rs ? $rs->fetch_all(MYSQLI_ASSOC) : [];
     // fallback group by prefix before first dot: pos.*, receipts.*, taxes.* else General
     foreach ($rows as &$r) {
@@ -82,6 +89,40 @@ function is_multiline_key(string $key): bool {
     if (strpos($k, $n) !== false) return true;
   }
   return false;
+}
+
+// Map keys to appropriate UI types
+function guess_ui_type(string $key, string $currentType): string {
+  if ($currentType !== 'text') return $currentType;
+  $k = strtolower($key);
+  if (strpos($k, 'email') !== false) return 'email';
+  if (strpos($k, 'website') !== false || strpos($k, 'url') !== false) return 'url';
+  if (strpos($k, 'phone') !== false || strpos($k, 'tel') !== false) return 'tel';
+  if (strpos($k, 'color') !== false || strpos($k, 'colour') !== false) return 'color';
+  if (strpos($k, 'width') !== false || strpos($k, 'height') !== false || strpos($k, 'size') !== false || strpos($k, 'decimal') !== false) return 'number';
+  return $currentType;
+}
+
+// Get predefined options for known settings
+function get_setting_options(string $key): array {
+  $k = strtolower($key);
+  $opts = [];
+  if (strpos($k, 'currency_symbol') !== false) {
+    $opts = ['$','€','£','UGX','KES','NGN','GHS','ZAR','INR','¥','₹','R','Fr','₡','₱'];
+  } elseif (strpos($k, 'currency_code') !== false) {
+    $opts = ['USD','EUR','GBP','UGX','KES','NGN','GHS','ZAR','INR','JPY','CNY','CAD','AUD','CHF'];
+  } elseif (strpos($k, 'decimal_places') !== false) {
+    $opts = ['0','1','2','3'];
+  } elseif (strpos($k, 'thousands_separator') !== false) {
+    $opts = [',','.',' ','none'];
+  } elseif (strpos($k, 'decimal_point') !== false) {
+    $opts = ['.',','];
+  } elseif (strpos($k, 'receipt_width') !== false) {
+    $opts = ['58','80','112'];
+  } elseif (strpos($k, 'app_theme') !== false) {
+    $opts = ['default','dark','ocean','forest','sunset','royal','slate','rose','coffee','cyber'];
+  }
+  return $opts;
 }
 
 // Pretty group order (optional)
@@ -183,6 +224,10 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
                         $desc = (string)($r['description'] ?? '');
                         $type = (string)($r['type'] ?? 'text');
                         $updated = (string)($r['updated_at'] ?? '');
+                        $options = (string)($r['options'] ?? '');
+                        $opts = json_decode($options, true);
+                        if (!is_array($opts)) $opts = get_setting_options($key);
+                        $uiType = guess_ui_type($key, $type);
                       ?>
                       <div class="settings-row setting-item"
                            data-key="<?= h($key) ?>"
@@ -201,27 +246,61 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
                           </div>
 
                           <div class="col-lg-6">
-                            <?php if ($type === 'bool'): ?>
+                            <?php if ($uiType === 'bool'): ?>
                               <div class="form-check form-switch mt-1">
                                 <input class="form-check-input setting-input" type="checkbox"
                                        data-type="bool"
                                        <?= ($val === '1' || strtolower($val)==='true' || strtolower($val)==='yes') ? 'checked' : '' ?>>
                                 <label class="form-check-label text-muted small">Toggle</label>
                               </div>
-                            <?php elseif ($type === 'json'): ?>
+                            <?php elseif ($uiType === 'select' && !empty($opts)): ?>
+                              <select class="form-select form-select-sm setting-input" data-type="select">
+                                <?php foreach ($opts as $opt): ?>
+                                  <option value="<?= h((string)$opt) ?>" <?= $val === (string)$opt ? 'selected' : '' ?>><?= h((string)$opt) ?></option>
+                                <?php endforeach; ?>
+                              </select>
+                            <?php elseif ($uiType === 'color'): ?>
+                              <div class="d-flex align-items-center gap-2">
+                                <input type="color" class="form-control form-control-sm setting-input form-control-color"
+                                       data-type="color"
+                                       value="<?= h($val ?: '#000000') ?>">
+                                <input type="text" class="form-control form-control-sm setting-input flex-grow-1"
+                                       data-type="color"
+                                       value="<?= h($val) ?>"
+                                       placeholder="#000000">
+                              </div>
+                            <?php elseif ($uiType === 'number'): ?>
+                              <input type="number" class="form-control form-control-sm setting-input"
+                                     data-type="number"
+                                     value="<?= h($val) ?>"
+                                     step="any">
+                            <?php elseif ($uiType === 'email'): ?>
+                              <input type="email" class="form-control form-control-sm setting-input"
+                                     data-type="email"
+                                     value="<?= h($val) ?>"
+                                     placeholder="email@example.com">
+                            <?php elseif ($uiType === 'url'): ?>
+                              <input type="url" class="form-control form-control-sm setting-input"
+                                     data-type="url"
+                                     value="<?= h($val) ?>"
+                                     placeholder="https://example.com">
+                            <?php elseif ($uiType === 'tel'): ?>
+                              <input type="tel" class="form-control form-control-sm setting-input"
+                                     data-type="tel"
+                                     value="<?= h($val) ?>"
+                                     placeholder="+256 700 000 000">
+                            <?php elseif ($uiType === 'json'): ?>
                               <textarea class="form-control form-control-sm setting-input"
                                         data-type="json" rows="6"><?= h($val) ?></textarea>
                               <div class="text-muted small mt-1">JSON value (normal Enter works for new lines)</div>
+                            <?php elseif ($uiType === 'textarea' || is_multiline_key($key) || strlen($val) > 80 || strpos($val, "\n") !== false): ?>
+                              <textarea class="form-control form-control-sm setting-input"
+                                        data-type="text"
+                                        rows="4"><?= h($val) ?></textarea>
                             <?php else: ?>
-                              <?php if (is_multiline_key($key) || strlen($val) > 80 || strpos($val, "\n") !== false): ?>
-                                <textarea class="form-control form-control-sm setting-input"
-                                          data-type="text"
-                                          rows="4"><?= h($val) ?></textarea>
-                              <?php else: ?>
-                                <input class="form-control form-control-sm setting-input"
-                                       data-type="text"
-                                       value="<?= h($val) ?>">
-                              <?php endif; ?>
+                              <input class="form-control form-control-sm setting-input"
+                                     data-type="text"
+                                     value="<?= h($val) ?>">
                             <?php endif; ?>
                           </div>
 
@@ -282,11 +361,25 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
 
         <div>
           <label class="form-label small">Type</label>
-          <select class="form-select" name="type">
-            <option value="text">text</option>
-            <option value="bool">bool</option>
-            <option value="json">json</option>
+          <select class="form-select" name="type" id="addSettingType">
+            <option value="text">Text</option>
+            <option value="textarea">Textarea</option>
+            <option value="bool">Boolean (Toggle)</option>
+            <option value="number">Number</option>
+            <option value="select">Select (Dropdown)</option>
+            <option value="email">Email</option>
+            <option value="url">URL</option>
+            <option value="tel">Phone</option>
+            <option value="color">Color</option>
+            <option value="json">JSON</option>
           </select>
+        </div>
+
+        <div id="addSettingOptionsWrap" class="d-none">
+          <label class="form-label small">Options (one per line, for Select type)</label>
+          <textarea class="form-control" name="options" id="addSettingOptions" rows="4"
+                    placeholder="Option1&#10;Option2&#10;Option3"></textarea>
+          <div class="form-text">Enter one option per line. The first option is the default.</div>
         </div>
 
         <div>
@@ -405,12 +498,17 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
     btn.addEventListener('click', async ()=>{
       const row = btn.closest('.setting-item');
       const key = btn.dataset.key || '';
-      const input = row?.querySelector('.setting-input');
+      let input = row?.querySelector('.setting-input');
+      // For color, prefer the text input (holds the full hex value)
+      if (input && input.dataset.type === 'color' && input.type === 'color') {
+        input = row.querySelector('input[data-type="color"]:not([type="color"])') || input;
+      }
       if (!input) return;
 
       let val = '';
       const type = input.dataset.type || 'text';
       if (type === 'bool') val = input.checked ? '1' : '0';
+      else if (type === 'color') val = (input.value || '').trim();
       else val = (input.value ?? '').replace(/\r\n/g, "\n").trimEnd();
 
       const fd = new FormData();
@@ -429,7 +527,7 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
           setTimeout(()=>{ btn.classList.remove('btn-outline-success'); btn.classList.add('btn-outline-primary'); }, 700);
           
           // If this is a permission-related setting, refresh the session
-          if (strpos($key, 'messaging') !== false || strpos($key, 'permission') !== false) {
+          if (key.includes('messaging') || key.includes('permission')) {
             // Clear permission cache by forcing session refresh
             if (function_exists('session_regenerate')) {
               session_regenerate(true);
@@ -494,6 +592,26 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
     const grow = () => { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; };
     t.addEventListener('input', grow);
     setTimeout(grow, 0);
+  });
+
+  // Toggle options field visibility for select type
+  const addTypeSelect = document.getElementById('addSettingType');
+  const addOptionsWrap = document.getElementById('addSettingOptionsWrap');
+  if (addTypeSelect && addOptionsWrap) {
+    addTypeSelect.addEventListener('change', () => {
+      addOptionsWrap.classList.toggle('d-none', addTypeSelect.value !== 'select');
+    });
+  }
+
+  // Sync color inputs
+  document.querySelectorAll('input[data-type="color"]').forEach(input => {
+    if (input.type === 'color') {
+      const textInput = input.parentElement.querySelector('input[data-type="color"]:not([type="color"])');
+      if (textInput) {
+        input.addEventListener('input', () => { textInput.value = input.value; });
+        textInput.addEventListener('input', () => { if (/^#[0-9a-fA-F]{6}$/.test(textInput.value)) input.value = textInput.value; });
+      }
+    }
   });
 
 })();

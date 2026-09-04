@@ -32,6 +32,12 @@ $group = trim((string)($_POST['group'] ?? 'General'));
 $type = trim((string)($_POST['type'] ?? 'text'));
 $desc = trim((string)($_POST['description'] ?? ''));
 $sort = (int)($_POST['sort_order'] ?? 0);
+$optionsRaw = trim((string)($_POST['options'] ?? ''));
+$options = '';
+if ($optionsRaw !== '') {
+  $opts = array_filter(array_map('trim', explode("\n", $optionsRaw)));
+  $options = json_encode(array_values($opts));
+}
 
 if ($key === '') out(['success'=>false,'message'=>'Key is required'], 422);
 
@@ -46,19 +52,28 @@ $hasGrouping = in_array('group', $cols, true);
 $hasType = in_array('type', $cols, true);
 $hasDescription = in_array('description', $cols, true);
 $hasSortOrder = in_array('sort_order', $cols, true);
+$hasOptions = in_array('options', $cols, true);
 
 // Build query based on available columns
 if ($hasGrouping && $hasType && $hasDescription && $hasSortOrder) {
-  // Full featured table
-  $sql = "INSERT INTO settings (`key`,`value`,`group`,`type`,`description`,`sort_order`) VALUES (?,?,?,?,?,?)
-          ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), `group`=VALUES(`group`), 
-          `type`=VALUES(`type`), `description`=VALUES(`description`), 
-          `sort_order`=VALUES(`sort_order`), updated_at=CURRENT_TIMESTAMP";
-  
-  $stmt = $db->prepare($sql);
-  if (!$stmt) out(['success'=>false,'message'=>'Prepare failed: '.$db->error], 500);
-  
-  $stmt->bind_param("sssssi", $key, $val, $group, $type, $desc, $sort);
+  if ($hasOptions) {
+    $sql = "INSERT INTO settings (`key`,`value`,`group`,`type`,`description`,`sort_order`,`options`) VALUES (?,?,?,?,?,?,?)
+            ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), `group`=VALUES(`group`), 
+            `type`=VALUES(`type`), `description`=VALUES(`description`), 
+            `sort_order`=VALUES(`sort_order`), `options`=VALUES(`options`),
+            updated_at=CURRENT_TIMESTAMP";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) out(['success'=>false,'message'=>'Prepare failed: '.$db->error], 500);
+    $stmt->bind_param("sssssis", $key, $val, $group, $type, $desc, $sort, $options);
+  } else {
+    $sql = "INSERT INTO settings (`key`,`value`,`group`,`type`,`description`,`sort_order`) VALUES (?,?,?,?,?,?)
+            ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), `group`=VALUES(`group`), 
+            `type`=VALUES(`type`), `description`=VALUES(`description`), 
+            `sort_order`=VALUES(`sort_order`), updated_at=CURRENT_TIMESTAMP";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) out(['success'=>false,'message'=>'Prepare failed: '.$db->error], 500);
+    $stmt->bind_param("sssssi", $key, $val, $group, $type, $desc, $sort);
+  }
 } else {
   // Basic table - just key/value
   $sql = "INSERT INTO settings (`key`,`value`) VALUES (?,?)
