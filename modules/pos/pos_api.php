@@ -491,12 +491,12 @@ if ($action === 'confirm_sale') {
   // --- document numbers: NEVER NULL ---
 $doc_type = in_array($doc_type, ['receipt','invoice','delivery_note'], true) ? $doc_type : 'receipt';
 
-$prefix = match ($doc_type) {
-  'receipt' => 'RC',
-  'invoice' => 'IN',
-  'delivery_note' => 'DN',
-  default => 'RC'
-};
+switch ($doc_type) {
+  case 'receipt': $prefix = 'RC'; break;
+  case 'invoice': $prefix = 'IN'; break;
+  case 'delivery_note': $prefix = 'DN'; break;
+  default: $prefix = 'RC'; break;
+}
 
 // always unique enough even for same-second checkouts
 $doc_no = $prefix . '-' . date('Ymd-His') . '-' . random_int(10, 99);

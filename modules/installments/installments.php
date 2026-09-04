@@ -412,25 +412,25 @@ require_once __DIR__ . '/../../templates/layout/header.php';
                         </td>
                       </tr>
                     <?php else: foreach ($rows as $r):
-                      $statusColor = match($r['status']) {
-                        'active' => 'success',
-                        'due_soon' => 'warning',
-                        'overdue' => 'danger',
-                        'completed' => 'info',
-                        'extended' => 'secondary',
-                        'discontinued' => 'dark',
-                        default => 'secondary'
-                      };
+                      switch($r['status']) {
+                        case 'active': $statusColor = 'success'; break;
+                        case 'due_soon': $statusColor = 'warning'; break;
+                        case 'overdue': $statusColor = 'danger'; break;
+                        case 'completed': $statusColor = 'info'; break;
+                        case 'extended': $statusColor = 'secondary'; break;
+                        case 'discontinued': $statusColor = 'dark'; break;
+                        default: $statusColor = 'secondary'; break;
+                      }
                       
-                      $statusIcon = match($r['status']) {
-                        'active' => '🟢',
-                        'due_soon' => '🟡',
-                        'overdue' => '🔴',
-                        'completed' => '✅',
-                        'extended' => '🔄',
-                        'discontinued' => '⚫',
-                        default => '📄'
-                      };
+                      switch($r['status']) {
+                        case 'active': $statusIcon = '🟢'; break;
+                        case 'due_soon': $statusIcon = '🟡'; break;
+                        case 'overdue': $statusIcon = '🔴'; break;
+                        case 'completed': $statusIcon = '✅'; break;
+                        case 'extended': $statusIcon = '🔄'; break;
+                        case 'discontinued': $statusIcon = '⚫'; break;
+                        default: $statusIcon = '📄'; break;
+                      }
                       
                       $paidPct = ($r['amount_due'] > 0) ? (int)((float)$r['amount_paid'] / (float)$r['amount_due'] * 100) : 0;
                     ?>

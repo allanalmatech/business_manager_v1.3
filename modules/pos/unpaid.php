@@ -455,12 +455,12 @@ require_once __DIR__ . '/../../templates/layout/header.php';
               <tr><td colspan="10" class="text-muted p-3">No unpaid sales found.</td></tr>
             <?php else: foreach ($rows as $r): ?>
               <?php
-                $statusBadge = match ((string)$r['status']) {
-                  'confirmed' => 'success',
-                  'voided' => 'danger',
-                  'draft' => 'secondary',
-                  default => 'secondary'
-                };
+                switch ((string)$r['status']) {
+                  case 'confirmed': $statusBadge = 'success'; break;
+                  case 'voided': $statusBadge = 'danger'; break;
+                  case 'draft': $statusBadge = 'secondary'; break;
+                  default: $statusBadge = 'secondary'; break;
+                }
               ?>
               <tr>
                 <td class="text-muted"><?= (int)$r['id'] ?></td>

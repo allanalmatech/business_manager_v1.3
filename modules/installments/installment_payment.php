@@ -559,14 +559,14 @@ include __DIR__ . '/../../templates/layout/header.php';
                     <label class="form-label text-muted small">Status</label>
                     <div>
                       <?php 
-                      $statusColor = match($installment['status']) {
-                        'completed' => 'success',
-                        'active' => 'primary',
-                        'overdue' => 'danger',
-                        'due_soon' => 'warning',
-                        'extended' => 'info',
-                        default => 'secondary'
-                      };
+                      switch($installment['status']) {
+                        case 'completed': $statusColor = 'success'; break;
+                        case 'active': $statusColor = 'primary'; break;
+                        case 'overdue': $statusColor = 'danger'; break;
+                        case 'due_soon': $statusColor = 'warning'; break;
+                        case 'extended': $statusColor = 'info'; break;
+                        default: $statusColor = 'secondary'; break;
+                      }
                       ?>
                       <span class="badge bg-<?= $statusColor ?>">
                         <?= h2(str_replace('_', ' ', ucfirst($installment['status']))) ?>

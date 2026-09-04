@@ -168,11 +168,11 @@ function pos_audit(mysqli $db, int $userId, string $action, string $metaJson = '
  */
 function pos_next_doc_no(mysqli $db, string $docType): string {
   $year = (int)date('Y');
-  $prefix = match ($docType) {
-    'invoice' => 'INV',
-    'delivery_note' => 'DN',
-    default => 'RC',
-  };
+  switch ($docType) {
+    case 'invoice': $prefix = 'INV'; break;
+    case 'delivery_note': $prefix = 'DN'; break;
+    default: $prefix = 'RC'; break;
+  }
 
   // Ensure row exists
   $ins = $db->prepare("INSERT IGNORE INTO doc_sequences (doc_type, year, prefix, current_no) VALUES (?,?,?,0)");

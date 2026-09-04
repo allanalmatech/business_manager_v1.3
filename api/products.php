@@ -5,6 +5,21 @@ declare(strict_types=1);
 ob_start();
 header('Content-Type: application/json; charset=utf-8');
 
+register_shutdown_function(function (): void {
+  $error = error_get_last();
+  if (!$error) return;
+
+  $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR];
+  if (!in_array((int)$error['type'], $fatalTypes, true)) return;
+
+  if (ob_get_length()) ob_clean();
+  http_response_code(500);
+  echo json_encode([
+    'ok' => false,
+    'error' => 'Server error: ' . ($error['message'] ?? 'Unknown error'),
+  ]);
+});
+
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
@@ -26,10 +41,8 @@ function out_err(string $msg, int $code = 400): void {
   exit;
 }
 
-$isAjax = (
-  (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
-  || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
-);
+// This file is an API endpoint, so it must return JSON even when opened directly.
+$isAjax = true;
 
 // If not logged in, do NOT redirect to HTML for AJAX
 if ($isAjax) {
@@ -570,13 +583,14 @@ try {
     }
     
     // Generate unique filename
-    $extension = match($mimeType) {
-      'image/jpeg', 'image/jpg' => 'jpg',
-      'image/png' => 'png',
-      'image/gif' => 'gif',
-      'image/webp' => 'webp',
-      default => 'jpg'
-    };
+    $extension = 'jpg';
+    if ($mimeType === 'image/png') {
+      $extension = 'png';
+    } elseif ($mimeType === 'image/gif') {
+      $extension = 'gif';
+    } elseif ($mimeType === 'image/webp') {
+      $extension = 'webp';
+    }
     
     $filename = 'product_' . ($productId > 0 ? $productId : 'scraped') . '_' . time() . '_' . mt_rand(1000, 9999) . '.' . $extension;
     $filepath = $uploadDir . $filename;

@@ -640,13 +640,13 @@ include __DIR__ . '/../../templates/layout/header.php';
                                     <td><?php echo $member['hire_date'] ? date('M d, Y', strtotime($member['hire_date'])) : '-'; ?></td>
                                     <td>
                                         <span class="badge bg-<?php 
-                                            echo match($member['status']) {
-                                                'active' => 'success',
-                                                'inactive' => 'warning',
-                                                'on_leave' => 'info',
-                                                'terminated' => 'danger',
-                                                default => 'secondary'
-                                            };
+                                            switch($member['status']) {
+                                                case 'active': echo 'success'; break;
+                                                case 'inactive': echo 'warning'; break;
+                                                case 'on_leave': echo 'info'; break;
+                                                case 'terminated': echo 'danger'; break;
+                                                default: echo 'secondary'; break;
+                                            }
                                         ?>">
                                             <?php echo ucfirst(str_replace('_', ' ', $member['status'])); ?>
                                         </span>

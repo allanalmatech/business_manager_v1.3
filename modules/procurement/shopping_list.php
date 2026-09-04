@@ -608,28 +608,28 @@ include __DIR__ . '/../../templates/layout/header.php';
                         </td>
                       </tr>
                     <?php else: foreach ($items as $item): 
-                      $statusColor = match($item['status']) {
-                        'pending' => 'warning',
-                        'ordered' => 'info',
-                        'received' => 'success',
-                        'cancelled' => 'secondary',
-                        default => 'secondary'
-                      };
+                      switch($item['status']) {
+                        case 'pending': $statusColor = 'warning'; break;
+                        case 'ordered': $statusColor = 'info'; break;
+                        case 'received': $statusColor = 'success'; break;
+                        case 'cancelled': $statusColor = 'secondary'; break;
+                        default: $statusColor = 'secondary'; break;
+                      }
                       
-                      $statusIcon = match($item['status']) {
-                        'pending' => '🟡',
-                        'ordered' => '🔵',
-                        'received' => '🟢',
-                        'cancelled' => '⚫',
-                        default => '📄'
-                      };
+                      switch($item['status']) {
+                        case 'pending': $statusIcon = '🟡'; break;
+                        case 'ordered': $statusIcon = '🔵'; break;
+                        case 'received': $statusIcon = '🟢'; break;
+                        case 'cancelled': $statusIcon = '⚫'; break;
+                        default: $statusIcon = '📄'; break;
+                      }
                       
-                      $priorityColor = match($item['priority']) {
-                        'high' => 'danger',
-                        'medium' => 'warning',
-                        'low' => 'info',
-                        default => 'secondary'
-                      };
+                      switch($item['priority']) {
+                        case 'high': $priorityColor = 'danger'; break;
+                        case 'medium': $priorityColor = 'warning'; break;
+                        case 'low': $priorityColor = 'info'; break;
+                        default: $priorityColor = 'secondary'; break;
+                      }
                     ?>
                       <tr>
                         <td>

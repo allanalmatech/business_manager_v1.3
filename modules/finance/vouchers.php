@@ -411,23 +411,23 @@ CREATE TABLE vouchers (
                     <?php if ($rows): ?>
                       <?php foreach ($rows as $r): ?>
                         <?php
-                          $statusColor = match($r['status']) {
-                            'draft' => 'secondary',
-                            'pending' => 'warning',
-                            'approved' => 'success',
-                            'rejected' => 'danger',
-                            'paid' => 'info',
-                            default => 'secondary'
-                          };
+                          switch($r['status']) {
+                            case 'draft': $statusColor = 'secondary'; break;
+                            case 'pending': $statusColor = 'warning'; break;
+                            case 'approved': $statusColor = 'success'; break;
+                            case 'rejected': $statusColor = 'danger'; break;
+                            case 'paid': $statusColor = 'info'; break;
+                            default: $statusColor = 'secondary'; break;
+                          }
                           
-                          $statusIcon = match($r['status']) {
-                            'draft' => '📝',
-                            'pending' => '⏳',
-                            'approved' => '✅',
-                            'rejected' => '❌',
-                            'paid' => '💰',
-                            default => '📄'
-                          };
+                          switch($r['status']) {
+                            case 'draft': $statusIcon = '📝'; break;
+                            case 'pending': $statusIcon = '⏳'; break;
+                            case 'approved': $statusIcon = '✅'; break;
+                            case 'rejected': $statusIcon = '❌'; break;
+                            case 'paid': $statusIcon = '💰'; break;
+                            default: $statusIcon = '📄'; break;
+                          }
                         ?>
                         <tr>
                           <td><strong><?= h($r['voucher_no']) ?></strong></td>

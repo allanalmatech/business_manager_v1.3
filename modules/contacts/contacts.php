@@ -389,12 +389,12 @@ include __DIR__ . '/../../templates/layout/header.php';
                                     <td><?php echo h2($contact['company'] ?? '-'); ?></td>
                                     <td>
                                         <span class="badge bg-<?php 
-                                            echo match($contact['type']) {
-                                                'staff' => 'primary',
-                                                'customer' => 'info',
-                                                'supplier' => 'warning',
-                                                default => 'secondary'
-                                            };
+                                            switch($contact['type']) {
+                                                case 'staff': echo 'primary'; break;
+                                                case 'customer': echo 'info'; break;
+                                                case 'supplier': echo 'warning'; break;
+                                                default: echo 'secondary'; break;
+                                            }
                                         ?>">
                                             <?php echo ucfirst($contact['type']); ?>
                                         </span>

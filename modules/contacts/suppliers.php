@@ -629,12 +629,12 @@ include __DIR__ . '/../../templates/layout/header.php';
                                     </td>
                                     <td>
                                         <span class="badge bg-<?php 
-                                            echo match($supp['status']) {
-                                                'active' => 'success',
-                                                'inactive' => 'warning',
-                                                'suspended' => 'danger',
-                                                default => 'secondary'
-                                            };
+                                            switch($supp['status']) {
+                                                case 'active': echo 'success'; break;
+                                                case 'inactive': echo 'warning'; break;
+                                                case 'suspended': echo 'danger'; break;
+                                                default: echo 'secondary'; break;
+                                            }
                                         ?>">
                                             <?php echo ucfirst($supp['status']); ?>
                                         </span>

@@ -496,11 +496,11 @@ include __DIR__ . '/../../templates/layout/header.php';
                                     </td>
                                     <td>
                                         <span class="badge bg-<?php 
-                                            echo match($priority) {
-                                                'Critical' => 'danger',
-                                                'High' => 'warning',
-                                                default => 'info'
-                                            };
+                                            switch($priority) {
+                                                case 'Critical': echo 'danger'; break;
+                                                case 'High': echo 'warning'; break;
+                                                default: echo 'info'; break;
+                                            }
                                         ?>">
                                             <?php echo $priority; ?>
                                         </span>

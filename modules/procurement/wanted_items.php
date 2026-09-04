@@ -677,25 +677,25 @@ include __DIR__ . '/../../templates/layout/header.php';
                                     <td><?php echo number_format((float)($item['estimated_cost'] ?? 0), 2); ?></td>
                                     <td>
                                         <span class="badge bg-<?php 
-                                            echo match($item['status']) {
-                                                'pending' => 'warning',
-                                                'approved' => 'success',
-                                                'ordered' => 'info',
-                                                'rejected' => 'danger',
-                                                default => 'secondary'
-                                            };
+                                            switch($item['status']) {
+                                                case 'pending': echo 'warning'; break;
+                                                case 'approved': echo 'success'; break;
+                                                case 'ordered': echo 'info'; break;
+                                                case 'rejected': echo 'danger'; break;
+                                                default: echo 'secondary'; break;
+                                            }
                                         ?>">
                                             <?php echo ucfirst($item['status']); ?>
                                         </span>
                                     </td>
                                     <td>
                                         <span class="badge bg-<?php 
-                                            echo match($item['priority']) {
-                                                'high' => 'danger',
-                                                'medium' => 'warning',
-                                                'low' => 'info',
-                                                default => 'secondary'
-                                            };
+                                            switch($item['priority']) {
+                                                case 'high': echo 'danger'; break;
+                                                case 'medium': echo 'warning'; break;
+                                                case 'low': echo 'info'; break;
+                                                default: echo 'secondary'; break;
+                                            }
                                         ?>">
                                             <?php echo ucfirst($item['priority']); ?>
                                         </span>

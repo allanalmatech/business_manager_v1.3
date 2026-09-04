@@ -852,13 +852,13 @@ require_once __DIR__ . '/../../templates/layout/header.php';
               <?php else: ?>
                 <?php
                   $status = (string)($r['status'] ?? '');
-                  $badge = match ($status) {
-                    'confirmed' => 'success',
-                    'voided' => 'danger',
-                    'draft' => 'secondary',
-                    'returned' => 'warning',
-                    default => 'secondary'
-                  };
+                  switch ($status) {
+                    case 'confirmed': $badge = 'success'; break;
+                    case 'voided': $badge = 'danger'; break;
+                    case 'draft': $badge = 'secondary'; break;
+                    case 'returned': $badge = 'warning'; break;
+                    default: $badge = 'secondary'; break;
+                  }
                 ?>
                 <tr>
                   <td class="text-muted"><?= (int)$r['id'] ?></td>
