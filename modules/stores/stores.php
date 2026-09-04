@@ -25,7 +25,7 @@ if ($action === 'save') {
   require_permission('stores.update');
   $id = (int)($_POST['id'] ?? 0);
   $name = trim((string)($_POST['name'] ?? ''));
-  $is_active = (int)($_POST['is_active'] ?? 1);
+  $is_active = isset($_POST['is_active']) ? 1 : 0;
   $low_alert_qty = (float)($_POST['low_alert_qty'] ?? 0);
   $low_alert_type = trim((string)($_POST['low_alert_type'] ?? 'pieces'));
 
