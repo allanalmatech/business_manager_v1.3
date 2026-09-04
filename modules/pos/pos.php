@@ -146,7 +146,7 @@ require_once __DIR__ . '/../../templates/layout/header.php';
 
       <div class="pos-search">
         <i class="bi bi-search"></i>
-        <input type="text" id="product_search" placeholder="Search SKU, name, barcode…" autocomplete="off">
+        <input type="text" id="product_search" placeholder="Search SKU, name, barcode…" autocomplete="off" autofocus>
       </div>
 
       <div class="pos-header-actions">
