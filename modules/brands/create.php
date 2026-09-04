@@ -143,7 +143,7 @@ include __DIR__ . '/../../templates/layout/header.php';
                 <div class="col-md-6">
                   <label for="name" class="form-label">Brand Name *</label>
                   <input type="text" class="form-control" id="name" name="name" 
-                         value="<?= h($_POST['name'] ?? '') ?>" required>
+                         value="<?= h($_POST['name'] ?? '') ?>" required autofocus>
                 </div>
                 <div class="col-md-6">
                   <label for="slug" class="form-label">Slug</label>
