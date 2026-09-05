@@ -157,6 +157,11 @@ try {
       if ($id > 0 && (int)$id !== $newId) $id = $newId; // ensure we update the matched one
     }
 
+    // Name already exists and no supplier id supplied → just reuse the existing row
+    if ($existing && $id <= 0) {
+      out_ok(['id' => $newId, 'existing' => true]);
+    }
+
     $email = trim((string)($raw['email'] ?? ''));
     if ($email === '') {
       // email column is NOT NULL + UNIQUE; generate a stable placeholder
