@@ -46,6 +46,7 @@ require_once __DIR__ . '/../../templates/layout/header.php';
                   <th>SKU</th>
                   <th>Name</th>
                   <th>Unit</th>
+                  <th>Category</th>
                   <th>Brand</th>
                   <th class="text-end">Cost</th>
                   <th class="text-end">Wholesale</th>
@@ -95,7 +96,8 @@ require_once __DIR__ . '/../../templates/layout/header.php';
 
           <div class="col-md-4">
             <label class="form-label">Source / Supplier</label>
-            <input class="form-control" id="source" placeholder="e.g. ABC Supplies">
+            <input class="form-control" id="source" list="supplierList" placeholder="e.g. ABC Supplies" autocomplete="off">
+            <datalist id="supplierList"></datalist>
           </div>
 
           <div class="col-md-4">
@@ -122,6 +124,14 @@ require_once __DIR__ . '/../../templates/layout/header.php';
           <div class="col-md-4">
             <label class="form-label">Default Location</label>
             <select class="form-select" id="default_location_id">
+              <option value="">— None —</option>
+            </select>
+          </div>
+
+          <!-- ✅ CATEGORY -->
+          <div class="col-md-4">
+            <label class="form-label">Category</label>
+            <select class="form-select" id="category_id">
               <option value="">— None —</option>
             </select>
           </div>
@@ -376,6 +386,10 @@ const hint = document.getElementById('hint');
 
 let currentProductId = null;
 let productImages = [];
+
+let allBrands = [];
+let genericBrandId = null;
+let allLocations = [];
 
 // Modals
 const bulkImportModal = new bootstrap.Modal(document.getElementById('mdlBulkImport'));
@@ -1019,6 +1033,7 @@ async function loadBrandsInto(selectId){
   if (!sel) return;
 
   sel.innerHTML = '<option value="">— None —</option>';
+  allBrands = [];
 
   try{
     const res = await fetch(BASE_URL + "/api/products.php?action=brands");
@@ -1032,15 +1047,79 @@ async function loadBrandsInto(selectId){
       console.warn('[brands] error:', json.error);
       return;
     }
-    const brands = json.data?.brands || [];
-    brands.forEach(b=>{
+    allBrands = json.data?.brands || [];
+    genericBrandId = json.data?.generic_id || null;
+    allBrands.forEach(b=>{
       const o = document.createElement('option');
       o.value = b.id;
       o.textContent = b.name;
       sel.appendChild(o);
     });
+
+    // If a brand was already selected (edit mode), restore it
+    if (sel.dataset.current && allBrands.some(b => String(b.id) === sel.dataset.current)) {
+      sel.value = sel.dataset.current;
+    } else if (genericBrandId) {
+      sel.value = String(genericBrandId);
+    }
+    delete sel.dataset.current;
   } catch(e){
     console.error('[brands] failed:', e);
+  }
+}
+
+/* ----------------------------
+   ✅ LOAD CATEGORIES INTO DROPDOWN
+----------------------------- */
+async function loadCategoriesInto(selectId){
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— None —</option>';
+  try{
+    const res = await fetch(BASE_URL + "/api/products.php?action=categories");
+    const txt = await res.text();
+    let json;
+    try { json = JSON.parse(txt); } catch(e){
+      console.error('[categories] non-json:', txt);
+      return;
+    }
+    if(!json.ok){ console.warn('[categories] error:', json.error); return; }
+    (json.data?.categories || []).forEach(c=>{
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = c.name;
+      sel.appendChild(o);
+    });
+    // Restore edit selection if present
+    if (sel.dataset.current) { sel.value = sel.dataset.current; delete sel.dataset.current; }
+  } catch(e){
+    console.error('[categories] failed:', e);
+  }
+}
+
+/* ----------------------------
+   ✅ LOAD SUPPLIERS INTO DATALIST (for reuse)
+----------------------------- */
+async function loadSuppliersInto(listId){
+  const dl = document.getElementById(listId);
+  if (!dl) return;
+  dl.innerHTML = '';
+  try{
+    const res = await fetch(BASE_URL + "/api/products.php?action=suppliers_list");
+    const txt = await res.text();
+    let json;
+    try { json = JSON.parse(txt); } catch(e){
+      console.error('[suppliers] non-json:', txt);
+      return;
+    }
+    if(!json.ok){ console.warn('[suppliers] error:', json.error); return; }
+    (json.data?.suppliers || []).forEach(s=>{
+      const o = document.createElement('option');
+      o.value = s.name;
+      dl.appendChild(o);
+    });
+  } catch(e){
+    console.error('[suppliers] failed:', e);
   }
 }
 
@@ -1084,6 +1163,7 @@ async function loadProducts(){
       <td>${escapeHtml(p.sku)}</td>
       <td>${escapeHtml(p.name)}</td>
       <td>${escapeHtml(p.unit_type)}${p.unit_type==='units' ? ' ('+escapeHtml(p.unit_name||'')+')' : ''}${p.unit_type==='boxes' ? ' • '+(p.pieces_per_box||0)+' pcs/box' : ''}</td>
+      <td>${escapeHtml(p.category_name || '')}</td>
       <td>${escapeHtml(p.brand_name || '')}</td>
       <td class="text-end">${num(p.cost_price)}</td>
       <td class="text-end">${num(p.wholesale_price)}</td>
@@ -1107,7 +1187,7 @@ function clearForm(){
   [
     'id','name','sku','description','source','unit_name','pieces_per_box',
     'cost_price','wholesale_price','retail_price','qty_base','low_level_base',
-    'default_location_id','brand_id'
+    'default_location_id','brand_id','category_id'
   ].forEach(i => {
     const el = document.getElementById(i);
     if (el) el.value = '';
@@ -1116,6 +1196,9 @@ function clearForm(){
   document.getElementById('unit_type').value = 'pieces';
   document.getElementById('is_active').value = '1';
   showUnitFields();
+
+  // Default brand → Generic (if any brand currently loaded)
+  if (genericBrandId) document.getElementById('brand_id').value = String(genericBrandId);
 
   const delBtn = document.getElementById('btnDelete');
   if (delBtn) delBtn.style.display = 'none';
@@ -1130,6 +1213,18 @@ async function openNew(){
   clearForm();
   document.getElementById('mdlTitle').textContent = "New Product";
   
+  // Default location → first available location (by default select the first option)
+  const locSel = document.getElementById('default_location_id');
+  if (locSel && locSel.options.length > 0) {
+    // Skip the "— None —" placeholder (value "") and select the first real location
+    const realOption = Array.from(locSel.options).find(o => o.value !== '');
+    if (realOption) locSel.value = realOption.value;
+  }
+
+  // Default brand → Generic (handled in clearForm) unless brands not loaded yet
+  const brandSel = document.getElementById('brand_id');
+  if (brandSel && !brandSel.value && genericBrandId) brandSel.value = String(genericBrandId);
+
   // Set a temporary ID for new products (will be replaced after save)
   currentProductId = 'new_' + Date.now();
   
@@ -1172,6 +1267,9 @@ async function openEdit(id){
   document.getElementById('is_active').value = String(p.is_active ?? 1);
   document.getElementById('default_location_id').value = p.default_location_id || '';
 
+  // ✅ CATEGORY
+  document.getElementById('category_id').value = p.category_id ? String(p.category_id) : '';
+
   // ✅ BRAND
   document.getElementById('brand_id').value = p.brand_id ? String(p.brand_id) : '';
 
@@ -1203,12 +1301,40 @@ async function save(){
   if(action==='create' && !canCreate) return;
   if(action==='update' && !canUpdate) return;
 
+  let name = document.getElementById('name').value.trim();
+  let sku = document.getElementById('sku').value.trim();
+
+  // Auto-generate SKU from the product name when blank
+  let skuAuto = false;
+  if (!sku && name) {
+    let base = name.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (base.length > 24) base = base.slice(0, 24);
+    base = base || 'SKU';
+    sku = base;
+    // Show a preview to the user; send blank so the backend generates a guaranteed-unique SKU
+    document.getElementById('sku').value = sku;
+    skuAuto = true;
+  }
+  if (skuAuto) sku = '';
+
+  // Auto-save a brand-new supplier so it can be reused on the next product entry
+  const sourceVal = document.getElementById('source').value.trim();
+  if (sourceVal) {
+    try {
+      await fetch(BASE_URL + "/api/products.php?action=suppliers_save", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ name: sourceVal })
+      });
+    } catch(e) { /* non-fatal */ }
+  }
+
   const payload = {
     id,
-    name: document.getElementById('name').value.trim(),
-    sku: document.getElementById('sku').value.trim(),
+    name,
+    sku,
     description: document.getElementById('description').value.trim(),
-    source: document.getElementById('source').value.trim(),
+    source: sourceVal,
     unit_type: document.getElementById('unit_type').value,
     unit_name: document.getElementById('unit_name').value.trim(),
     pieces_per_box: Number(document.getElementById('pieces_per_box').value || 0),
@@ -1218,6 +1344,9 @@ async function save(){
     qty_base: Number(document.getElementById('qty_base').value || 0),
     low_level_base: Number(document.getElementById('low_level_base').value || 0),
     default_location_id: Number(document.getElementById('default_location_id').value) || 0,
+
+    // ✅ CATEGORY (0 = none)
+    category_id: Number(document.getElementById('category_id').value) || 0,
 
     // ✅ BRAND (0 = none)
     brand_id: Number(document.getElementById('brand_id').value) || 0,
@@ -1329,14 +1458,17 @@ async function loadLocationsInto(selectId){
   }
   if(!json.ok){ console.warn(json.error || "Failed to load locations"); return; }
 
+  allLocations = json.data || [];
   const sel = document.getElementById(selectId);
   sel.innerHTML = '<option value="">— None —</option>';
-  json.data.forEach(l=>{
+  allLocations.forEach(l=>{
     const o = document.createElement('option');
     o.value = l.id;
     o.textContent = l.name;
     sel.appendChild(o);
   });
+  // Preserve an edit-time selection if stored (loaded asynchronously)
+  if (sel.dataset.current) { sel.value = sel.dataset.current; delete sel.dataset.current; }
 }
 
 document.getElementById('unit_type').addEventListener('change', showUnitFields);
@@ -1384,6 +1516,8 @@ window.addEventListener('message', function(event) {
 
 // init
 loadLocationsInto('default_location_id');
-loadBrandsInto('brand_id');   // ✅ load brands
+loadBrandsInto('brand_id');     // ✅ load brands
+loadCategoriesInto('category_id');  // ✅ load categories
+loadSuppliersInto('supplierList');  // ✅ load suppliers for reuse
 loadProducts();
 </script>

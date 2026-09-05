@@ -134,6 +134,7 @@ function sidebar_group(string $id, string $icon, string $title, array $items, st
     <?php if (has_permission('products.view')): ?>
       <?php sidebar_group('inventory','<i class="bi bi-box-seam"></i>','Inventory',[
         ['href'=>'/modules/products/products.php','label'=>'Products','icon'=>'<i class="bi bi-boxes"></i>'],
+        ['href'=>'/modules/products/suppliers.php','label'=>'Suppliers','icon'=>'<i class="bi bi-building"></i>'],
         ['href'=>'/modules/products/categories.php','label'=>'Categories','icon'=>'<i class="bi bi-tags"></i>'],
         ['href'=>'/modules/brands/index.php','label'=>'Brands','icon'=>'<i class="bi bi-tags-fill"></i>'],
         ['href'=>'/modules/products/stock_levels.php','label'=>'Stock Levels','icon'=>'<i class="bi bi-graph-down"></i>'],

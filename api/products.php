@@ -78,12 +78,139 @@ try {
      BRANDS
   ========================== */
   if ($action === 'brands') {
+    $tableExists = $db->query("SHOW TABLES LIKE 'brands'");
+    if (!$tableExists || $tableExists->num_rows === 0) {
+      out_err('Brands table not found. Create brands first.', 500);
+    }
+
+    // Ensure a "Generic" brand always exists so it can be the default
+    $chk = $db->query("SELECT id FROM brands WHERE LOWER(name)='generic' OR slug='generic' LIMIT 1");
+    $genericId = 0;
+    if ($chk) {
+      $genericRow = $chk->fetch_row();
+      if ($genericRow) $genericId = (int)$genericRow[0];
+    }
+    if (!$genericId) {
+      $ins = $db->prepare("INSERT INTO brands (name, slug, description, status) VALUES ('Generic','generic','Default brand when none is selected','active')");
+      if ($ins && $ins->execute()) {
+        $genericId = (int)$ins->insert_id;
+      }
+      if ($ins) $ins->close();
+    }
+
     $rows = [];
-    $res = $db->query("SELECT id, name FROM brands WHERE status='active' ORDER BY name ASC");
+    $res = $db->query("SELECT id, name, slug FROM brands WHERE status='active' ORDER BY name ASC");
     if (!$res) out_err('Brands table not found. Create brands first.', 500);
 
     while ($r = $res->fetch_assoc()) $rows[] = $r;
-    out_ok(['brands' => $rows]);
+    out_ok(['brands' => $rows, 'generic_id' => $genericId]);
+  }
+
+  /* =========================
+     SUPPLIERS — used by the add-product form for re-use + the suppliers module
+  ========================== */
+  if ($action === 'suppliers_list') {
+    $q = trim((string)($_GET['q'] ?? ''));
+    $where = "1=1";
+    $params = [];
+    $types = "";
+    if ($q !== '') {
+      $where .= " AND (name LIKE ? OR company_name LIKE ?)";
+      $like = "%$q%";
+      $params[] = $like; $params[] = $like;
+      $types .= "ss";
+    }
+    $sql = "SELECT id, name, email, phone, company_name, contact_person, city, state, country, category, payment_terms, status, preferred, rating FROM suppliers WHERE $where ORDER BY name ASC LIMIT 500";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) out_err('Suppliers table not found. Create suppliers first.', 500);
+    if ($types !== '') $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    out_ok(['suppliers' => $rows]);
+  }
+
+  // Save/auto-create a supplier (used by product form + module)
+  if ($action === 'suppliers_save') {
+    $canCreate = $isAjax ? user_has_permission('products.create') : true;
+    $canUpdate = $isAjax ? user_has_permission('products.update') : true;
+    if (!$canCreate && !$canUpdate) out_err('Permission denied', 403);
+    $raw = json_decode((string)file_get_contents('php://input'), true);
+    if (!is_array($raw)) {
+      $raw = $_POST;
+    }
+
+    $id = (int)($raw['id'] ?? 0);
+    $name = trim((string)($raw['name'] ?? ''));
+    if ($name === '') out_err('Supplier name is required');
+
+    // Look up an existing supplier by name (case-insensitive) to reuse
+    $lookup = $db->prepare("SELECT id FROM suppliers WHERE LOWER(name)=LOWER(?) LIMIT 1");
+    $lookup->bind_param("s", $name);
+    $lookup->execute();
+    $existing = $lookup->get_result()->fetch_row();
+    $lookup->close();
+
+    $newId = 0;
+    if ($existing) {
+      $newId = (int)$existing[0];
+      if ($id > 0 && (int)$id !== $newId) $id = $newId; // ensure we update the matched one
+    }
+
+    $email = trim((string)($raw['email'] ?? ''));
+    if ($email === '') {
+      // email column is NOT NULL + UNIQUE; generate a stable placeholder
+      $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '', $name));
+      $slug = $slug !== '' ? $slug : 'supplier';
+      $email = 'noreply-' . $slug . '@local';
+    }
+
+    $phone = trim((string)($raw['phone'] ?? ''));
+    $company_name = trim((string)($raw['company_name'] ?? ''));
+    $contact_person = trim((string)($raw['contact_person'] ?? ''));
+    $city = trim((string)($raw['city'] ?? ''));
+    $state = trim((string)($raw['state'] ?? ''));
+    $country = trim((string)($raw['country'] ?? ''));
+    $category = trim((string)($raw['category'] ?? ''));
+    $payment_terms = trim((string)($raw['payment_terms'] ?? ''));
+    $preferred = !empty($raw['preferred']) ? 1 : 0;
+
+    if ($id > 0) {
+      $stmt = $db->prepare("UPDATE suppliers SET name=?, email=?, phone=?, company_name=?, contact_person=?, city=?, state=?, country=?, category=?, payment_terms=?, preferred=? WHERE id=?");
+      if (!$stmt) out_err('Update failed (suppliers table missing?)', 500);
+      $stmt->bind_param("ssssssssssii", $name, $email, $phone, $company_name, $contact_person, $city, $state, $country, $category, $payment_terms, $preferred, $id);
+      $ok = $stmt->execute();
+      $stmt->close();
+      if (!$ok) out_err('Update failed', 400);
+      $newId = $id;
+      if (function_exists('audit_log')) audit_log('products.supplier_update', 'supplier', (string)$newId, "Updated supplier: $name");
+    } else {
+      $stmt = $db->prepare("INSERT INTO suppliers (name, email, phone, company_name, contact_person, city, state, country, category, payment_terms, status, preferred, rating) VALUES (?,?,?,?,?,?,?,?,?,?,'active',?,0)");
+      if (!$stmt) out_err('Suppliers table missing', 500);
+      $stmt->bind_param("ssssssssssi", $name, $email, $phone, $company_name, $contact_person, $city, $state, $country, $category, $payment_terms, $preferred);
+      $ok = $stmt->execute();
+      if (!$ok) {
+        $errcode = $db->errno;
+        $stmt->close();
+        // Duplicate email → update the existing row instead of failing
+        if ($errcode === 1062 && !$existing) {
+          $lk = $db->prepare("SELECT id FROM suppliers WHERE email=? LIMIT 1");
+          $lk->bind_param("s", $email);
+          $lk->execute();
+          $row = $lk->get_result()->fetch_row();
+          $lk->close();
+          if ($row) {
+            $newId = (int)$row[0];
+            out_ok(['id' => $newId, 'existing' => true]);
+          }
+        }
+        out_err('Insert failed: ' . $errcode, 400);
+      }
+      $newId = (int)$stmt->insert_id;
+      $stmt->close();
+      if (function_exists('audit_log')) audit_log('products.supplier_add', 'supplier', (string)$newId, "Added supplier: $name");
+    }
+    out_ok(['id' => $newId]);
   }
 
   /* =========================
@@ -401,10 +528,53 @@ try {
     }
 
     if ($name === '') out_err('Product name is required');
-    if ($sku === '') out_err('SKU is required');
-    if (strlen($sku) > 50) out_err('SKU must be 50 characters or less');
     if (strlen($name) > 200) out_err('Product name must be 200 characters or less');
     if (strlen($source) > 255) out_err('Source must be 255 characters or less');
+
+    // Auto-generate SKU from the product name when left blank
+    if ($sku === '') {
+      $base = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '', $name));
+      $base = $base !== '' ? $base : 'SKU';
+      if (strlen($base) > 24) $base = substr($base, 0, 24);
+      $candidate = $base;
+      $counter = 1;
+      $taken = true;
+      while ($taken) {
+        $probe = $db->prepare("SELECT 1 FROM products WHERE sku=? " . ($action === 'update' && $id > 0 ? "AND id<>$id " : "") . "LIMIT 1");
+        $probe->bind_param("s", $candidate);
+        $probe->execute();
+        $taken = (bool)$probe->get_result()->fetch_row();
+        $probe->close();
+        if ($taken) {
+          $counter++;
+          $candidate = $base . '-' . $counter;
+          if (strlen($candidate) > 50) $candidate = $base . substr((string)time(), -6) . '-' . $counter;
+        }
+      }
+      $sku = $candidate;
+    }
+    if (strlen($sku) > 50) out_err('SKU must be 50 characters or less');
+
+    // Persist the supplier (source) so it can be reused on the next product entry
+    if ($source !== '') {
+      try {
+        $slookup = $db->prepare("SELECT id FROM suppliers WHERE LOWER(name)=LOWER(?) LIMIT 1");
+        $slookup->bind_param("s", $source);
+        $slookup->execute();
+        $sexists = $slookup->get_result()->fetch_row();
+        $slookup->close();
+        if (!$sexists) {
+          $sem = 'noreply-' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '', $source)) . '@local';
+          $sem = $sem !== 'noreply-@local' ? $sem : 'noreply-supplier@local';
+          $sins = $db->prepare("INSERT INTO suppliers (name, email, status, preferred, rating) VALUES (?, ?, 'active', 0, 0)");
+          $sins->bind_param("ss", $source, $sem);
+          @$sins->execute();
+          $sins->close();
+        }
+      } catch (Throwable $e) {
+        // non-fatal — supplier saving must not block product save
+      }
+    }
 
     $valid = ['boxes','dozens','pairs','pieces','units'];
     if (!in_array($unit_type, $valid, true)) out_err('Invalid unit_type');
