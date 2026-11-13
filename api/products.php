@@ -492,7 +492,8 @@ try {
     need_perm($needPerm, $isAjax);
 
     $raw = json_decode((string)file_get_contents('php://input'), true);
-    if (!is_array($raw)) out_err('Invalid JSON');
+    if (!is_array($raw)) $raw = $_POST;
+    if (!$raw) out_err('Invalid request data');
 
     $id = (int)($raw['id'] ?? 0);
 
