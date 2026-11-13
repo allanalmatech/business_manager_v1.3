@@ -492,8 +492,12 @@ try {
     need_perm($needPerm, $isAjax);
 
     $raw = json_decode((string)file_get_contents('php://input'), true);
-    if (!is_array($raw)) $raw = $_POST;
-    if (!$raw) out_err('Invalid request data');
+    if (!is_array($raw)) out_err('Invalid JSON');
+    if (isset($raw['payload'])) {
+      $decoded = base64_decode((string)$raw['payload'], true);
+      $raw = $decoded !== false ? json_decode($decoded, true) : null;
+      if (!is_array($raw)) out_err('Invalid encoded product data');
+    }
 
     $id = (int)($raw['id'] ?? 0);
 

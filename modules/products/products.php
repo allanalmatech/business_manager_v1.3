@@ -1357,10 +1357,11 @@ async function save(){
     images: JSON.stringify(productImages)
   };
 
+  const encodedPayload = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   const res = await fetch(BASE_URL + "/api/products.php?action=" + action, {
     method: "POST",
-    headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
-    body: new URLSearchParams(payload).toString()
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({payload: encodedPayload})
   });
 
   const txt = await res.text();
