@@ -1368,7 +1368,8 @@ async function save(){
   try { json = JSON.parse(txt); }
   catch(e){
     console.error('[products save] non-json:', txt);
-    alert('Server returned non-JSON. See console.');
+    const detail = txt.trim().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 300);
+    alert(`Save failed: server returned HTTP ${res.status} instead of JSON.${detail ? `\n\n${detail}` : ''}`);
     return;
   }
 

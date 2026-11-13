@@ -10,9 +10,10 @@ declare(strict_types=1);
  * - Avoids parse errors by complete structure
  */
 
-// Suppress errors for API endpoints (PHP 7 compatible)
+// Suppress displayed errors for API endpoints so they cannot corrupt JSON.
 $reqUri = isset($_SERVER['REQUEST_URI']) ? (string)$_SERVER['REQUEST_URI'] : '';
-if ($reqUri !== '' && strpos($reqUri, '_api.php') !== false) {
+$isApiRequest = defined('API_REQUEST') || preg_match('~/api(?:/|$)~', $reqUri) === 1;
+if ($isApiRequest) {
     ini_set('display_errors', '0');
 }
 
@@ -35,6 +36,10 @@ $mysqli = new mysqli(
 
 if ($mysqli->connect_error) {
     http_response_code(500);
+    if ($isApiRequest) {
+        header('Content-Type: application/json; charset=utf-8');
+        die(json_encode(['ok' => false, 'error' => 'Database connection failed.']));
+    }
     die('Database connection failed.');
 }
 
