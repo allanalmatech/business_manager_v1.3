@@ -11,3 +11,14 @@ RemoveType .php .phtml .phar .php3 .php4 .php5 .php7 .phps
 <FilesMatch "\.(?i:php\d?|phtml|phar|phps|cgi|pl|py|sh|htaccess)$">
   Require all denied
 </FilesMatch>
+
+# Photos never change under the same name, so phones can keep them for a long time
+<IfModule mod_expires.c>
+ExpiresActive On
+ExpiresByType image/jpeg "access plus 1 year"
+ExpiresByType image/png "access plus 1 year"
+ExpiresByType image/webp "access plus 1 year"
+</IfModule>
+<IfModule mod_headers.c>
+Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>

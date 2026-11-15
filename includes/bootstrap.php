@@ -91,23 +91,30 @@ function bootstrap_can_use_db_sessions(mysqli $mysqli): bool
     return true;
 }
 
-// DB session handler (optional)
-$sessionBackend = 'php';
-$sessionHandlerFile = __DIR__ . '/session_db.php';
-if (is_file($sessionHandlerFile)) {
-    require_once $sessionHandlerFile;
+// Token-authenticated requests (api/v1) carry no cookie session at all
+$bmStateless = defined('BM_STATELESS');
+$sessionBackend = 'none';
+if ($bmStateless) {
+    $_SESSION = [];
+} else {
+    // DB session handler (optional)
+    $sessionBackend = 'php';
+    $sessionHandlerFile = __DIR__ . '/session_db.php';
+    if (is_file($sessionHandlerFile)) {
+        require_once $sessionHandlerFile;
 
-    if (class_exists('DbSessionHandler') && bootstrap_can_use_db_sessions($mysqli)) {
-        $handler = new DbSessionHandler($mysqli, 60 * 60 * 2); // 2h
-        if (session_set_save_handler($handler, true)) {
-            $sessionBackend = 'database';
+        if (class_exists('DbSessionHandler') && bootstrap_can_use_db_sessions($mysqli)) {
+            $handler = new DbSessionHandler($mysqli, 60 * 60 * 2); // 2h
+            if (session_set_save_handler($handler, true)) {
+                $sessionBackend = 'database';
+            }
         }
     }
-}
 
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_name('BMSESSID');
-    session_start();
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_name('BMSESSID');
+        session_start();
+    }
 }
 
 // Make DB accessible
@@ -115,8 +122,10 @@ $GLOBALS['db'] = $mysqli;
 
 // CSRF: one token per session, enforced for every signed-in write request
 require_once __DIR__ . '/csrf.php';
-csrf_token();
-csrf_enforce($isApiRequest || preg_match('~/pos_api\.php~', $reqUri) === 1);
+if (!$bmStateless) {
+    csrf_token();
+    csrf_enforce($isApiRequest || preg_match('~/pos_api\.php~', $reqUri) === 1);
+}
 $GLOBALS['SESSION_BACKEND'] = $sessionBackend;
 
 // Base URL for assets/links (subfolder safe)

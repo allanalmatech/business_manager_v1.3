@@ -92,4 +92,16 @@ $db->query("DELETE FROM login_attempts WHERE created_at < DATE_SUB(NOW(), INTERV
 $db->query("DELETE FROM password_resets WHERE expires_at < DATE_SUB(NOW(), INTERVAL 1 DAY)");
 $db->query("DELETE FROM phone_scan_sessions WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 DAY)");
 $db->query("DELETE FROM reminder_log WHERE created_at < DATE_SUB(NOW(), INTERVAL 365 DAY)");
+// Change feed: keep only the newest entry per record once it is over 30 days old.
+// Devices further behind than the floor are sent a full copy instead.
+$cut = $db->query("SELECT COALESCE(MAX(id), 0) FROM sync_changes WHERE changed_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+$cutId = $cut ? (int)$cut->fetch_row()[0] : 0;
+if ($cutId > 0) {
+    $db->query("DELETE c FROM sync_changes c JOIN sync_changes n ON n.entity = c.entity AND n.entity_key = c.entity_key AND n.id > c.id WHERE c.id <= $cutId");
+    if ($db->affected_rows > 0) {
+        $db->query("INSERT INTO settings (`key`, `value`, `group`, `type`, `description`) VALUES ('sync_floor', '$cutId', 'System', 'text', 'Oldest sync version still complete')
+                    ON DUPLICATE KEY UPDATE `value` = GREATEST(CAST(`value` AS UNSIGNED), $cutId)");
+    }
+}
+$db->query("DELETE FROM sync_mutations WHERE created_at < DATE_SUB(NOW(), INTERVAL 180 DAY)");
 $say('Done.');
