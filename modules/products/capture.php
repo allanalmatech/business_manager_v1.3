@@ -31,6 +31,9 @@ $_SESSION['mobile_csrf'] = $csrf;
 <!doctype html>
 <html lang="en">
 <head>
+  <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token()) ?>">
+  <meta name="base-url" content="<?= htmlspecialchars($GLOBALS['BASE_URL'] ?? '') ?>">
+  <script src="<?= htmlspecialchars($GLOBALS['BASE_URL'] ?? '') ?>/assets/js/core.js"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Capture Product Image</title>

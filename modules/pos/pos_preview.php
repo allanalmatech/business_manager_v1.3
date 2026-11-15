@@ -44,10 +44,9 @@ function read_json(): array {
   return is_array($j) ? $j : [];
 }
 
-function csrf_check(string $token): void {
-  if (empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $token)) {
-    out_html("<div class='alert alert-danger'>CSRF failed (refresh page)</div>", 403);
-  }
+function csrf_check($token): void {
+  // The token (header, form field or JSON body) is verified centrally in includes/csrf.php
+  if (!csrf_is_valid() && !verify_csrf_token((string)$token)) out(['ok'=>false,'error'=>'CSRF failed (refresh page)'], 403);
 }
 
 function num($v): float {

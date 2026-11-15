@@ -6,6 +6,7 @@ require_once dirname(dirname(__DIR__)) . '/includes/bootstrap.php';
 require_once dirname(dirname(__DIR__)) . '/includes/auth.php';
 require_once dirname(dirname(__DIR__)) . '/includes/helpers.php';
 require_once dirname(dirname(__DIR__)) . '/includes/rbac.php';
+require_once dirname(dirname(__DIR__)) . '/includes/notifications.php';
 
 // Initialize variables
 $errors = [];
@@ -38,26 +39,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $user = $stmt->get_result()->fetch_assoc();
                 $stmt->close();
                 
-                if ($user) {
-                    // Generate reset token
+                if ($user && login_throttle_wait($db, 'reset:' . $email) === 0) {
+                    login_record_attempt($db, 'reset:' . $email, false); // counts toward the reset limit
                     $reset_token = bin2hex(random_bytes(32));
+                    $token_hash = hash('sha256', $reset_token);
                     $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
-                    
-                    // Store reset token
+
+                    // Only a hash of the token is stored
                     $stmt = $db->prepare("
-                        INSERT INTO password_resets (email, token, expires_at, created_at) 
+                        INSERT INTO password_resets (email, token, expires_at, created_at)
                         VALUES (?, ?, ?, NOW())
                     ");
-                    $stmt->bind_param('sss', $email, $reset_token, $expires_at);
+                    $stmt->bind_param('sss', $email, $token_hash, $expires_at);
                     $stmt->execute();
                     $stmt->close();
-                    
-                    $success = 'Password reset link has been sent to your email.';
-                    $step = 2;
-                    $token = $reset_token;
-                } else {
-                    $errors[] = 'No account found with that email address.';
+
+                    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                    $link = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . ($GLOBALS['BASE_URL'] ?? '')
+                          . '/modules/auth/forgot_password.php?token=' . $reset_token;
+                    send_email(
+                        $email,
+                        'Reset your password',
+                        "Hello " . $user['username'] . ",\n\nUse this link to choose a new password. It expires in 1 hour.\n\n"
+                        . $link . "\n\nIf you did not ask for this, ignore this email."
+                    );
                 }
+                // Same answer whether or not the account exists
+                $success = 'If that email belongs to an account, a reset link has been sent.';
+                $step = 2;
             } else {
                 $errors[] = 'Database connection error.';
             }
@@ -85,7 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     WHERE pr.token = ? AND pr.expires_at > NOW() AND pr.used = 0 
                     ORDER BY pr.created_at DESC LIMIT 1
                 ");
-                $stmt->bind_param('s', $token);
+                $token_hash = hash('sha256', (string)$token);
+                $stmt->bind_param('s', $token_hash);
                 $stmt->execute();
                 $reset_request = $stmt->get_result()->fetch_assoc();
                 $stmt->close();
@@ -107,7 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         UPDATE password_resets SET used = 1, used_at = NOW() 
                         WHERE token = ?
                     ");
-                    $stmt->bind_param('s', $token);
+                    $token_hash = hash('sha256', (string)$token);
+                $stmt->bind_param('s', $token_hash);
                     $stmt->execute();
                     $stmt->close();
                     
@@ -122,9 +133,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $token = $_GET['token'] ?? '';
-    if (!empty($token)) {
-        $step = 2;
+    $token = (string)($_GET['token'] ?? '');
+    if ($token !== '') {
+        $step = 3; // show the new-password form
     }
 }
 

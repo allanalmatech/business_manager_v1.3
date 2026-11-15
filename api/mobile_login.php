@@ -5,6 +5,7 @@ ob_start();
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../includes/bootstrap.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/audit.php';
 
 function mobile_out(array $payload, int $status = 200): void
@@ -34,6 +35,11 @@ if (!$db instanceof mysqli) {
     mobile_out(['success' => false, 'message' => 'DB not available'], 500);
 }
 
+$wait = login_throttle_wait($db, $username);
+if ($wait > 0) {
+    mobile_out(['success' => false, 'message' => 'Too many failed attempts. Try again later.', 'retry_after' => $wait], 429);
+}
+
 $stmt = $db->prepare("SELECT u.id, u.role_id, r.name AS role, u.username, u.full_name,
                              u.password_hash, u.is_active
                       FROM users u
@@ -48,12 +54,15 @@ $user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$user || (int)$user['is_active'] !== 1 || !password_verify($password, (string)$user['password_hash'])) {
+    login_record_attempt($db, $username, false);
     audit_log('auth.mobile_login_failed', 'user', $username, 'Invalid credentials');
     mobile_out(['success' => false, 'message' => 'Invalid credentials'], 401);
 }
 
+login_record_attempt($db, $username, true);
 session_regenerate_id(true);
-$_SESSION['csrf'] = bin2hex(random_bytes(32));
+unset($_SESSION['csrf']);
+csrf_token();
 $_SESSION['user'] = [
     'id' => (int)$user['id'],
     'role_id' => (int)$user['role_id'],

@@ -2,7 +2,12 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/bootstrap.php';
+require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/rbac.php';
 require_once __DIR__ . '/../../includes/helpers.php';
+
+require_login();
+require_permission('pos.view');
 
 header('Content-Type: application/json');
 
@@ -44,7 +49,7 @@ $sql = "
 $st = $db->prepare($sql);
 if (!$st) {
   http_response_code(500);
-  echo json_encode(['success'=>false,'message'=>'Prepare failed: '.$db->error]);
+  echo json_encode(['success'=>false,'message'=>'Search is unavailable right now']);
   exit;
 }
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/audit.php';
 
 $BASE_URL = $GLOBALS['BASE_URL'] ?? '';
@@ -21,6 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = (string)($_POST['password'] ?? '');
 
         $db = $GLOBALS['db'];
+        $wait = login_throttle_wait($db, $username);
+        if ($wait > 0) {
+            $error = 'Too many failed attempts. Try again in ' . (int)ceil($wait / 60) . ' minute(s).';
+        } else {
 
         $stmt = $db->prepare("
           SELECT u.id, u.role_id, r.name AS role, u.username, u.full_name, u.password_hash, u.is_active
@@ -36,9 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$user || (int)$user['is_active'] !== 1 || !password_verify($password, $user['password_hash'])) {
             $error = "Invalid credentials.";
+            login_record_attempt($db, $username, false);
             audit_log('auth.login_failed', 'user', $username, 'Invalid credentials');
         } else {
+            login_record_attempt($db, $username, true);
             session_regenerate_id(true);
+            unset($_SESSION['csrf']);
+            csrf_token();
 
             $_SESSION['user'] = [
                 'id'      => (int)$user['id'],
@@ -60,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: {$BASE_URL}/index.php");
             exit;
         }
+        } // throttle
     }
 }
 ?>
@@ -237,7 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="small mt-4" style="opacity:.85;">
                   <div class="d-flex gap-2 align-items-center">
                     <i class="bi bi-info-circle"></i>
-                    Use demo accounts below for testing.
+                    Sign in with the account your administrator gave you.
                   </div>
                 </div>
               </div>
@@ -294,7 +304,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                       <input class="form-check-input" type="checkbox" id="rememberMe" name="remember" value="1">
                       <label class="form-check-label small" for="rememberMe">Remember me</label>
                     </div>
-                    <a class="small" href="<?= htmlspecialchars($BASE_URL) ?>/forgot_password.php">Forgot password?</a>
+                    <a class="small" href="<?= htmlspecialchars($BASE_URL) ?>/modules/auth/forgot_password.php">Forgot password?</a>
                   </div>
 
                   <button class="btn btn-primary w-100 btn-auth">
@@ -303,54 +313,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </form>
 
                 <!-- Demo Users -->
-                <div class="mt-4 demo-box">
-                  <div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="fw-bold">
-                      <i class="bi bi-people me-1"></i> Demo Users
-                    </div>
-                    <span class="badge bg-secondary">Testing</span>
-                  </div>
-
-                  <div class="demo-row">
-                    <div>
-                      <div class="demo-k">Admin</div>
-                      <div class="demo-v" data-copy="admin">admin</div>
-                      <div class="demo-k">Password: <span class="demo-v" data-copy="Admin@123">Admin@123</span></div>
-                    </div>
-                    <button class="btn btn-sm btn-outline-primary copy-btn" type="button"
-                      data-copy-btn data-u="admin" data-p="Admin@123">
-                      <i class="fa-solid fa-paste"></i>
-                    </button>
-                  </div>
-
-                  <div class="demo-row">
-                    <div>
-                      <div class="demo-k">Cashier</div>
-                      <div class="demo-v" data-copy="cashier">cashier1</div>
-                      <div class="demo-k">Password: <span class="demo-v" data-copy="Cashier@123">Cashier@123</span></div>
-                    </div>
-                    <button class="btn btn-sm btn-outline-primary copy-btn" type="button"
-                      data-copy-btn data-u="cashier1" data-p="Cashier@123">
-                      <i class="fa-solid fa-paste"></i>
-                    </button>
-                  </div>
-
-                  <div class="demo-row">
-                    <div>
-                      <div class="demo-k">Accountant</div>
-                      <div class="demo-v" data-copy="accountant1">accountant1</div>
-                      <div class="demo-k">Password: <span class="demo-v" data-copy="Accountant1@123">Accountant1@123</span></div>
-                    </div>
-                    <button class="btn btn-sm btn-outline-primary copy-btn" type="button"
-                      data-copy-btn data-u="accountant1" data-p="Accountant1@123">
-                      <i class="fa-solid fa-paste"></i>
-                    </button>
-                  </div>
-
-                  <div class="small text-muted mt-2">
-                    Tip: click the paste icon to auto-fill the login form.
-                  </div>
-                </div>
+                
 
               </div>
             </div>

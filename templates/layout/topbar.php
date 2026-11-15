@@ -69,19 +69,9 @@ if (!empty($_SESSION['user']['id']) && ($GLOBALS['db'] ?? null) instanceof mysql
     </div>
 
     <!-- Global search (compact on mobile) -->
-    <form class="d-none d-md-flex" role="search" action="/modules/search.php" method="get">
-      <input class="form-control form-control-sm" name="q" placeholder="Search products, contacts, invoices…" />
+    <form class="d-none d-md-flex" role="search" action="<?= htmlspecialchars($BASE_URL) ?>/modules/search.php" method="get">
+      <input class="form-control form-control-sm" name="q" placeholder="Search products, customers, receipts…" aria-label="Search" value="<?= htmlspecialchars((string)($_GET['q'] ?? '')) ?>" />
     </form>
-
-    <!-- Notifications -->
-    <a class="btn btn-outline-secondary btn-sm position-relative" href="/modules/notifications.php" title="Notifications">
-      <i class="bi bi-bell"></i>
-    <?php if (!empty($notif_badge) && (int)$notif_badge > 0): ?>
-        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-          <?= (int)$notif_badge ?>
-        </span>
-      <?php endif; ?>
-    </a>
 
     <!-- Messages -->
     <a class="btn btn-outline-secondary btn-sm position-relative" href="<?= htmlspecialchars($BASE_URL) ?>/modules/messaging/inbox.php" title="Messages">

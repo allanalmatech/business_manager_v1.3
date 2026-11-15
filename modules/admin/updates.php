@@ -32,26 +32,45 @@ $currentVersion = defined('APP_VERSION') ? (string)APP_VERSION : '1.0.0';
           <div class="text-muted small"><?= h($page_subtitle) ?></div>
         </div>
 
-        <div class="card shadow-sm">
-          <div class="card-body">
-            <div class="mb-2">
-              <div class="text-muted small">Current version</div>
-              <div class="fs-5 fw-semibold"><?= h($currentVersion) ?></div>
+        <div class="row g-3">
+          <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+              <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                  <div>
+                    <div class="text-muted small">Installed version</div>
+                    <div class="fs-5 fw-semibold"><?= h($currentVersion) ?> <span class="text-muted small" id="updCommit"></span></div>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" id="btnCheck"><i class="bi bi-arrow-repeat me-1"></i>Check for updates</button>
+                    <button class="btn btn-primary" id="btnApply" disabled><i class="bi bi-cloud-download me-1"></i>Update now</button>
+                  </div>
+                </div>
+                <div id="updStatus" class="alert alert-secondary mb-3">Press “Check for updates” to see what is new.</div>
+                <ul class="list-group list-group-flush small" id="updChanges"></ul>
+                <div id="updMigrate" class="d-none mt-3">
+                  <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-0">
+                    <span>The database needs <b id="updMigCount">0</b> pending step(s).</span>
+                    <button class="btn btn-sm btn-warning" id="btnMigrate">Update database</button>
+                  </div>
+                </div>
+                <details class="mt-3 small text-muted"><summary>Technical details</summary><pre class="bg-light border rounded p-2 mt-2 mb-0" id="logBox" style="white-space:pre-wrap"></pre></details>
+              </div>
             </div>
-
-            <div class="d-flex gap-2">
-              <button class="btn btn-outline-primary" id="btnCheck">Check for Updates</button>
-              <button class="btn btn-primary" id="btnApply" disabled>Apply Update</button>
+          </div>
+          <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+              <div class="card-body">
+                <div class="fw-semibold mb-2">How updates work</div>
+                <ul class="small text-muted ps-3 mb-0">
+                  <li>Updates are pulled from the project's git repository, on the branch this server was installed from.</li>
+                  <li>Your data, uploads and database settings are never overwritten.</li>
+                  <li>If files on the server were edited by hand and clash with an update, the update stops and nothing changes.</li>
+                  <li>Database changes that ship with an update are applied automatically afterwards.</li>
+                  <li>Every update is recorded under Update History.</li>
+                </ul>
+              </div>
             </div>
-
-            <div class="mt-3">
-              <pre class="bg-light border rounded p-2 small mb-0" id="logBox">Ready.</pre>
-            </div>
-<!--
-            <div class="small text-muted mt-2">
-              This page expects API endpoints:
-              <b>api/updates/check.php</b> and <b>api/updates/apply.php</b>.
-            </div> -->
           </div>
         </div>
       </div>
@@ -60,33 +79,56 @@ $currentVersion = defined('APP_VERSION') ? (string)APP_VERSION : '1.0.0';
 </div>
 
 <script>
-(async function(){
-  const logBox = document.getElementById('logBox');
-  const btnCheck = document.getElementById('btnCheck');
-  const btnApply = document.getElementById('btnApply');
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const status = (msg, kind) => { $('updStatus').className = 'alert mb-3 alert-' + kind; $('updStatus').textContent = msg; };
+  const busy = (b, on) => { b.disabled = on; };
 
-  let payload = null;
+  async function call(path, opts) {
+    const res = await fetch(BM.url(path), opts || {});
+    let j;
+    try { j = await res.json(); } catch (e) { j = {success:false, message:'The server returned an unexpected response.'}; }
+    $('logBox').textContent = JSON.stringify(j, null, 2);
+    return j;
+  }
 
-  const log = (m)=>{ logBox.textContent += "\n" + m; };
+  function showMigrations(list) {
+    const n = (list || []).length;
+    $('updMigCount').textContent = n;
+    $('updMigrate').classList.toggle('d-none', n === 0);
+  }
 
-  btnCheck.addEventListener('click', async ()=>{
-    logBox.textContent = "Checking...";
-    const res = await fetch('api/updates/check.php', {credentials:'same-origin'});
-    const j = await res.json();
-    payload = j;
-    logBox.textContent = JSON.stringify(j, null, 2);
-    btnApply.disabled = !j.success || !j.update_available;
+  $('btnCheck').addEventListener('click', async () => {
+    busy($('btnCheck'), true); status('Checking…', 'secondary'); $('updChanges').innerHTML = '';
+    const j = await call('api/updates/check.php');
+    busy($('btnCheck'), false);
+    showMigrations(j.pending_migrations);
+    if (!j.success) { status(j.message || 'Could not check for updates.', 'warning'); $('btnApply').disabled = true; return; }
+    $('updCommit').textContent = j.current ? '(' + j.current + ', ' + j.branch + ')' : '';
+    status(j.message, j.update_available ? 'info' : 'success');
+    $('updChanges').innerHTML = (j.changes || []).map(c => '<li class="list-group-item px-0">' + esc(c) + '</li>').join('');
+    if ((j.local_changes || []).length) {
+      $('updChanges').insertAdjacentHTML('afterbegin', '<li class="list-group-item px-0 text-warning">' + j.local_changes.length + ' file(s) on this server were edited by hand. The update will stop if they clash.</li>');
+    }
+    $('btnApply').disabled = !j.update_available;
   });
 
-  btnApply.addEventListener('click', async ()=>{
-    if (!payload?.update_available) return;
-    if (!confirm('Apply update now?')) return;
+  $('btnApply').addEventListener('click', async () => {
+    if (!confirm('Update the system now? Ask staff to pause sales for a minute.')) return;
+    busy($('btnApply'), true); status('Updating… do not close this page.', 'secondary');
+    const j = await call('api/updates/apply.php', {method:'POST'});
+    status(j.message || (j.success ? 'Updated.' : 'Update failed.'), j.success ? 'success' : 'danger');
+    if (j.success) { $('updChanges').innerHTML = ''; showMigrations([]); }
+  });
 
-    logBox.textContent = "Applying update...";
-    const res = await fetch('api/updates/apply.php', {method:'POST', credentials:'same-origin'});
-    const j = await res.json();
-    logBox.textContent = JSON.stringify(j, null, 2);
-    btnApply.disabled = true;
+  $('btnMigrate').addEventListener('click', async () => {
+    busy($('btnMigrate'), true);
+    const fd = new FormData(); fd.append('mode', 'migrate');
+    const j = await call('api/updates/apply.php', {method:'POST', body: fd});
+    busy($('btnMigrate'), false);
+    status(j.message || 'Done.', j.success ? 'success' : 'danger');
+    if (j.success) showMigrations([]);
   });
 })();
 </script>

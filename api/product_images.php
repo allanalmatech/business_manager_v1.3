@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/bootstrap.php';
+require_once __DIR__ . '/../includes/uploads.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/helpers.php';
@@ -94,8 +95,9 @@ try {
     }
     
     // Generate unique filename
-    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = 'product_' . $productId . '_capture_' . time() . '_' . mt_rand(1000, 9999) . '.' . $extension;
+    $extension = upload_image_ext_for_file($file['tmp_name']);
+    if ($extension === null) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'Invalid image file']); exit; }
+    $filename = upload_random_name('product_' . $productId . '_capture', $extension);
     $filepath = $uploadDir . $filename;
     
     // Move uploaded file

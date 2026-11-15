@@ -26,8 +26,9 @@ if (!defined('APP_VERSION')) {
     define('APP_VERSION', isset($appCfg['app_version']) ? (string)$appCfg['app_version'] : '1.0.0');
 }
 
-// Connect DB
-$mysqli = new mysqli(
+// Connect DB (errors are handled explicitly, never thrown to the browser)
+mysqli_report(MYSQLI_REPORT_OFF);
+$mysqli = @new mysqli(
     (string)$dbCfg['host'],
     (string)$dbCfg['username'],
     (string)$dbCfg['password'],
@@ -40,7 +41,8 @@ if ($mysqli->connect_error) {
         header('Content-Type: application/json; charset=utf-8');
         die(json_encode(['ok' => false, 'error' => 'Database connection failed.']));
     }
-    die('Database connection failed.');
+    $setupHint = is_file(__DIR__ . '/../config/installed.lock') ? '' : ' If this is a new install, open setup.php.';
+    die('Database connection failed.' . $setupHint);
 }
 
 $charset = isset($dbCfg['charset']) ? (string)$dbCfg['charset'] : 'utf8mb4';
@@ -108,17 +110,18 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-// CSRF token seed
-if (empty($_SESSION['csrf'])) {
-    $_SESSION['csrf'] = bin2hex(random_bytes(32));
-}
-
 // Make DB accessible
 $GLOBALS['db'] = $mysqli;
+
+// CSRF: one token per session, enforced for every signed-in write request
+require_once __DIR__ . '/csrf.php';
+csrf_token();
+csrf_enforce($isApiRequest || preg_match('~/pos_api\.php~', $reqUri) === 1);
 $GLOBALS['SESSION_BACKEND'] = $sessionBackend;
 
 // Base URL for assets/links (subfolder safe)
 $BASE_URL = '';
+$baseResolved = false;
 
 $docRoot = isset($_SERVER['DOCUMENT_ROOT']) ? realpath((string)$_SERVER['DOCUMENT_ROOT']) : '';
 $projRoot = realpath(__DIR__ . '/..');
@@ -128,17 +131,19 @@ if ($docRoot && $projRoot) {
     $projRootN = str_replace('\\', '/', rtrim($projRoot, "\\/"));
 
     if (stripos($projRootN, $docRootN) === 0) {
-        $rel = substr($projRootN, strlen($docRootN));
-        $rel = '/' . ltrim((string)$rel, '/');
-        $BASE_URL = rtrim($rel, '/');
+        $BASE_URL = rtrim('/' . ltrim((string)substr($projRootN, strlen($docRootN)), '/'), '/');
+        $baseResolved = true; // an empty value is correct here: the app sits at the web root
     }
 }
 
-if ($BASE_URL === '') {
-    $scriptName = isset($_SERVER['SCRIPT_NAME']) ? (string)$_SERVER['SCRIPT_NAME'] : '';
-    $BASE_URL = rtrim(dirname($scriptName), '/\\');
-    if ($BASE_URL === '/' || $BASE_URL === '\\') {
-        $BASE_URL = '';
+if (!$baseResolved) {
+    // Aliased or symlinked installs: strip this script's path inside the project from its URL
+    $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $scriptFile = str_replace('\\', '/', (string)realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? '')));
+    $projRootN  = str_replace('\\', '/', (string)$projRoot);
+    $inside = ($projRootN !== '' && strpos($scriptFile, $projRootN) === 0) ? substr($scriptFile, strlen($projRootN)) : '';
+    if ($inside !== '' && substr($scriptName, -strlen($inside)) === $inside) {
+        $BASE_URL = rtrim(substr($scriptName, 0, -strlen($inside)), '/');
     }
 }
 

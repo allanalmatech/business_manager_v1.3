@@ -3,7 +3,7 @@
 
 return [
     'app_name'     => 'Business Manager Pro',
-    'app_version'  => '1.2',
+    'app_version'  => '1.4.0',
     'timezone'     => 'Africa/Kampala',
 
     'base_url'     => '', // auto-detect if empty

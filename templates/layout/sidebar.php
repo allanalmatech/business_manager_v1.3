@@ -2,15 +2,6 @@
 // templates/layout/sidebar.php
 $BASE_URL = $GLOBALS['BASE_URL'] ?? '';
 
-// Check if user has specific permission
-function has_permission(string $perm): bool {
-  // Check if function exists and user has permission
-  if (function_exists('user_has_permission')) {
-    return user_has_permission($perm);
-  }
-  return false;
-}
-
 // Helper to render a group as collapsible if >2 items
 // function sidebar_group(string $id, string $icon, string $title, array $items, string $baseUrl): void {
 //     $count = count($items);

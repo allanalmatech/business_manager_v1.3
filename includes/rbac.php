@@ -47,11 +47,22 @@ function user_has_permission(string $permKey): bool
     return $ok;
 }
 
+function has_permission(string $perm): bool
+{
+    return user_has_permission($perm);
+}
+
 function require_permission(string $permKey): void
 {
     require_login();
     if (!user_has_permission($permKey)) {
         http_response_code(403);
+        $uri = (string)($_SERVER['REQUEST_URI'] ?? '');
+        if (preg_match('~/api/|pos_api\.php~', $uri) === 1) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'success' => false, 'error' => 'Permission denied', 'message' => 'Permission denied']);
+            exit;
+        }
         
         // Include app header and sidebar for consistent styling
         require_once __DIR__ . '/../templates/layout/header.php';

@@ -22,6 +22,7 @@ register_shutdown_function(function (): void {
 
 define('API_REQUEST', true);
 require_once __DIR__ . '/../includes/bootstrap.php';
+require_once __DIR__ . '/../includes/uploads.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/helpers.php';
@@ -730,10 +731,15 @@ try {
       out_err('Invalid image URL format');
     }
     
+    if (!upload_url_is_public($url)) {
+      out_err('That image address is not allowed');
+    }
+
     // Download image content
     $ctx = stream_context_create([
       'http' => [
         'timeout' => 10,
+        'follow_location' => 0,
         'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       ]
     ]);
@@ -822,8 +828,9 @@ try {
     }
     
     // Generate unique filename
-    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = 'product_' . ($productId > 0 ? $productId : 'temp') . '_' . time() . '_' . mt_rand(1000, 9999) . '.' . $extension;
+    $extension = upload_image_ext_for_file($file['tmp_name']);
+    if ($extension === null) out_err('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed');
+    $filename = upload_random_name('product_' . ($productId > 0 ? $productId : 'temp'), $extension);
     $filepath = $uploadDir . $filename;
     
     // Move uploaded file

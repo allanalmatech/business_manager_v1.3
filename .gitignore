@@ -1,0 +1,11 @@
+# Local install state (written by setup.php)
+config/db.local.php
+config/installed.lock
+# Runtime files
+storage/logs/*.log
+storage/backups/*
+!storage/backups/.gitkeep
+error_log
+*.zip
+# Never commit database dumps with live data
+/*.sql

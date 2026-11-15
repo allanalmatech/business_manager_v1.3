@@ -68,8 +68,8 @@ $st->close();
 
 // Main select: per-sale revenue and COGS
 $selectSql = "SELECT s.id, s.doc_no, s.created_at, s.grand_total AS revenue,
-    COALESCE(SUM(COALESCE(p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0) AS cogs,
-    (s.grand_total - COALESCE(SUM(COALESCE(p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0)) AS gross_profit
+    COALESCE(SUM(COALESCE(si.unit_cost, si.external_cost, p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0) AS cogs,
+    (s.grand_total - COALESCE(SUM(COALESCE(si.unit_cost, si.external_cost, p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0)) AS gross_profit
     FROM sales s
     LEFT JOIN sale_items si ON si.sale_id = s.id
     LEFT JOIN products p ON p.id = si.product_id
@@ -97,14 +97,19 @@ $rows = $st->get_result()->fetch_all(MYSQLI_ASSOC);
 $st->close();
 
 // Totals across the filtered set
-$totalsSql = "SELECT IFNULL(SUM(s.grand_total),0) AS revenue, COALESCE(SUM(COALESCE(p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0) AS cogs
-    FROM sales s
-    LEFT JOIN sale_items si ON si.sale_id = s.id
-    LEFT JOIN products p ON p.id = si.product_id
-    $whereSql";
+// Revenue is summed per sale and cost per line in separate subqueries, so a sale
+// with several lines is counted once (joining them multiplied revenue by the line count).
+$totalsSql = "SELECT
+      (SELECT IFNULL(SUM(s.grand_total),0) FROM sales s $whereSql) AS revenue,
+      (SELECT COALESCE(SUM(COALESCE(si.unit_cost, si.external_cost, p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0)
+         FROM sales s
+         JOIN sale_items si ON si.sale_id = s.id
+         LEFT JOIN products p ON p.id = si.product_id
+         $whereSql) AS cogs";
 $st = $db->prepare($totalsSql);
 if ($types !== '') {
-    $st->bind_param($types, ...$params);
+    // the filter appears in both subqueries
+    $st->bind_param($types . $types, ...array_merge($params, $params));
 }
 $st->execute();
 $res = $st->get_result()->fetch_assoc();
@@ -120,8 +125,8 @@ $lastPage = max(1, (int)ceil($total / $perPage));
 if ($export) {
     // Stream CSV of the full filtered set (no pagination)
     $csvSql = "SELECT s.id, s.doc_no, s.created_at, s.grand_total AS revenue,
-        COALESCE(SUM(COALESCE(p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0) AS cogs,
-        (s.grand_total - COALESCE(SUM(COALESCE(p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0)) AS gross_profit
+        COALESCE(SUM(COALESCE(si.unit_cost, si.external_cost, p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0) AS cogs,
+        (s.grand_total - COALESCE(SUM(COALESCE(si.unit_cost, si.external_cost, p.cost_price, 0) * COALESCE(NULLIF(si.qty_base, 0), si.qty_input, 0)), 0)) AS gross_profit
         FROM sales s
         LEFT JOIN sale_items si ON si.sale_id = s.id
         LEFT JOIN products p ON p.id = si.product_id

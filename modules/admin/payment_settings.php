@@ -71,7 +71,7 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">Flutterwave Secret Key</label>
-                    <input class="form-control" name="flutterwave_secret_key" value="<?= h($vals['flutterwave_secret_key'] ?? '') ?>">
+                    <input class="form-control" name="flutterwave_secret_key" type="password" autocomplete="off" value="" placeholder="<?= !empty($vals['flutterwave_secret_key']) ? 'Saved. Leave blank to keep it' : 'Not set' ?>">
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">Environment</label>
@@ -83,7 +83,7 @@ require_once dirname(dirname(__DIR__)) . '/templates/layout/header.php';
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">Encryption Key (optional)</label>
-                    <input class="form-control" name="flutterwave_encryption_key" value="<?= h($vals['flutterwave_encryption_key'] ?? '') ?>">
+                    <input class="form-control" name="flutterwave_encryption_key" type="password" autocomplete="off" value="" placeholder="<?= !empty($vals['flutterwave_encryption_key']) ? 'Saved. Leave blank to keep it' : 'Not set' ?>">
                   </div>
                 </div>
 

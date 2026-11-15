@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once dirname(dirname(__DIR__)) . '/includes/bootstrap.php';
+require_once dirname(dirname(__DIR__)) . '/includes/uploads.php';
 require_once dirname(dirname(__DIR__)) . '/includes/auth.php';
 require_once dirname(dirname(__DIR__)) . '/includes/helpers.php';
 require_once dirname(dirname(__DIR__)) . '/includes/rbac.php';
@@ -116,8 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_photo'])) {
             }
             
             // Generate unique filename
-            $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $filename = 'user_' . $currentUser['id'] . '_' . time() . '.' . $extension;
+            $extension = upload_image_ext_for_file($file['tmp_name']) ?? 'jpg';
+            $filename = upload_random_name('user_' . (int)$currentUser['id'], $extension);
             $filepath = $uploadDir . $filename;
             
             if (move_uploaded_file($file['tmp_name'], $filepath)) {

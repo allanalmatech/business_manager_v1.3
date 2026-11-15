@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/bootstrap.php';
+require_once __DIR__ . '/../includes/uploads.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/helpers.php';
@@ -161,7 +162,8 @@ if ($action === 'import_url') {
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
     $destPath = $uploadDir . $fileName;
 
-    $imgData = @file_get_contents($url);
+    if (!upload_url_is_public((string)$url)) json_err('That image address is not allowed');
+    $imgData = @file_get_contents($url, false, stream_context_create(['http'=>['timeout'=>10,'follow_location'=>0]]));
     if ($imgData === false) json_err('Failed to fetch image from URL');
     $tmp = tempnam(sys_get_temp_dir(), 'imgurl');
     file_put_contents($tmp, $imgData);

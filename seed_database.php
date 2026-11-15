@@ -6,6 +6,11 @@ mysqli_report(MYSQLI_REPORT_OFF);
 
 $isCli = PHP_SAPI === 'cli';
 if (!$isCli) {
+    // Web access is disabled: this script resets passwords. Use setup.php to install.
+    http_response_code(404);
+    exit;
+}
+if (!$isCli) {
     header('Content-Type: text/html; charset=utf-8');
 }
 
