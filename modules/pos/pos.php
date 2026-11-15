@@ -76,6 +76,10 @@ require_once __DIR__ . '/../../templates/layout/header.php';
 
 <link rel="stylesheet" href="<?= h($BASE_URL) ?>/assets/css/pos.css?v=3">
 
+<div class="pos-cartbar" id="posCartBar">
+  <div><div class="small" data-count>0 items</div><div class="fw-bold fs-5" data-total>0</div></div>
+  <button type="button" class="btn btn-light fw-semibold">View sale <i class="bi bi-chevron-down" aria-hidden="true"></i></button>
+</div>
 <div class="pos-shell">
 
   <!-- LEFT -->
@@ -188,8 +192,17 @@ require_once __DIR__ . '/../../templates/layout/header.php';
             <label class="btn btn-outline-primary" for="pm_wholesale">Wholesale</label>
           </div>
 
+          <button class="btn btn-outline-secondary btn-sm" id="btnHoldSale" type="button" title="Hold this sale (F8)">
+            <i class="bi bi-pause-circle" aria-hidden="true"></i> Hold
+          </button>
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              Held <span class="badge text-bg-primary d-none" id="heldCount">0</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" id="heldMenu"></ul>
+          </div>
           <button class="btn btn-outline-secondary btn-sm" id="btnNewSale" type="button">
-            <i class="bi bi-arrow-clockwise"></i> Clear
+            <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Clear
           </button>
         </div>
       </div>
@@ -298,7 +311,7 @@ require_once __DIR__ . '/../../templates/layout/header.php';
         </button>
         
         <button class="btn btn-success btn-lg w-100 py-3 fw-bold shadow-sm" type="button" id="btnConfirm">
-          <i class="bi bi-check2-circle me-2"></i> COMPLETE SALE
+          <i class="bi bi-check2-circle me-2" aria-hidden="true"></i> COMPLETE SALE <span class="small fw-normal d-none d-lg-inline">(F9)</span>
         </button>
       </div>
 

@@ -1,159 +1,101 @@
 <?php
-$BASE_URL = $GLOBALS['BASE_URL'] ?? '';
 // templates/layout/topbar.php
-// Expected vars (optional): $current_user_name, $current_user_role
+// Optional vars: $page_title, $page_subtitle, $current_user_role
+$BASE_URL = $GLOBALS['BASE_URL'] ?? '';
+$tb_db = $GLOBALS['db'] ?? null;
+$tb_e = static function ($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
 
-// Count unread messages
 $unread_messages = 0;
-if (!empty($_SESSION['user']['id']) && ($GLOBALS['db'] ?? null) instanceof mysqli) {
-    $db = $GLOBALS['db'];
-    $userId = (int)$_SESSION['user']['id'];
-    
-    // Get user's role_id for role-based messages
-    $userRole = null;
-    $roleQuery = $db->prepare("SELECT role_id FROM users WHERE id = ? LIMIT 1");
-    $roleQuery->bind_param('i', $userId);
-    $roleQuery->execute();
-    $roleResult = $roleQuery->get_result()->fetch_assoc();
-    if ($roleResult) {
-        $userRole = (int)($roleResult['role_id'] ?? 0);
+$tb_alerts = [];
+if (!empty($_SESSION['user']['id']) && $tb_db instanceof mysqli) {
+    $tb_uid = (int)$_SESSION['user']['id'];
+    $tb_rid = (int)($_SESSION['user']['role_id'] ?? 0);
+    $tb_q = $tb_db->prepare("SELECT COUNT(*) FROM message_logs
+        WHERE ((recipient_type = 'user' AND recipient_id = ?) OR (recipient_type = 'role' AND recipient_id = ?) OR recipient_type = 'all')
+          AND (is_read = 0 OR is_read IS NULL)");
+    if ($tb_q) {
+        $tb_q->bind_param('ii', $tb_uid, $tb_rid);
+        if ($tb_q->execute()) $unread_messages = (int)($tb_q->get_result()->fetch_row()[0] ?? 0);
+        $tb_q->close();
     }
-    $roleQuery->close();
-    
-    // Count unread messages (user-specific, role-based, and all users)
-    $table = '';
-    $result = $db->query("SHOW TABLES LIKE 'message_logs'");
-    if ($result && $result->num_rows > 0) {
-        $table = 'message_logs';
-    } else {
-        $result = $db->query("SHOW TABLES LIKE 'messages'");
-        if ($result && $result->num_rows > 0) {
-            $table = 'messages';
-        }
-    }
-    
-    if ($table) {
-        $unreadQuery = $db->prepare("
-            SELECT COUNT(*) as count FROM {$table} 
-            WHERE 
-                ((recipient_type = 'user' AND recipient_id = ?) OR
-                (recipient_type = 'role' AND recipient_id = ?) OR
-                (recipient_type = 'all'))
-                AND (is_read = 0 OR is_read IS NULL)
-        ");
-        $roleIdBind = $userRole ?? 0;
-        $unreadQuery->bind_param('ii', $userId, $roleIdBind);
-        $unreadQuery->execute();
-        $unreadResult = $unreadQuery->get_result()->fetch_assoc();
-        $unread_messages = (int)($unreadResult['count'] ?? 0);
-        $unreadQuery->close();
-    }
+    require_once dirname(__DIR__, 2) . '/includes/alerts.php';
+    $tb_alerts = alerts_for_user($tb_db, $BASE_URL);
 }
+$tb_alert_total = function_exists('alerts_total') ? alerts_total($tb_alerts) : 0;
+$tb_user = $_SESSION['user'] ?? [];
 ?>
-<header class="app-topbar border-bottom">
+<header class="app-topbar">
   <div class="container-fluid d-flex align-items-center gap-2 py-2">
 
-    <!-- Mobile sidebar toggle -->
-    <button class="btn btn-outline-secondary btn-sm d-lg-none" id="btnSidebarOpen" type="button">
-      <i class="bi bi-list"></i>
+    <button class="topbar-btn d-lg-none" id="btnSidebarOpen" type="button" aria-label="Open menu" aria-controls="appSidebar" aria-expanded="false">
+      <i class="bi bi-list" aria-hidden="true"></i>
+    </button>
+    <button class="topbar-btn d-none d-lg-inline-flex" id="btnSidebarToggle" type="button" aria-label="Collapse or expand menu" aria-controls="appSidebar">
+      <i class="bi bi-layout-sidebar-inset" aria-hidden="true"></i>
     </button>
 
-    <!-- Desktop collapse toggle -->
-    <button class="btn btn-outline-secondary btn-sm d-none d-lg-inline-flex" id="btnSidebarToggle" type="button" title="Collapse sidebar">
-      <i class="bi bi-layout-sidebar-inset"></i>
-    </button>
-
-    <div class="flex-grow-1">
-      <div class="fw-semibold"><?= htmlspecialchars($page_title ?? 'Dashboard') ?></div>
-      <div class="text-muted small d-none d-md-block"><?= htmlspecialchars($page_subtitle ?? '') ?></div>
+    <div class="topbar-title flex-grow-1">
+      <div class="fw-semibold"><?= $tb_e($page_title ?? 'Dashboard') ?></div>
+      <?php if (!empty($page_subtitle)): ?><div class="text-muted small d-none d-md-block"><?= $tb_e($page_subtitle) ?></div><?php endif; ?>
     </div>
 
-    <!-- Global search (compact on mobile) -->
-    <form class="d-none d-md-flex" role="search" action="<?= htmlspecialchars($BASE_URL) ?>/modules/search.php" method="get">
-      <input class="form-control form-control-sm" name="q" placeholder="Search products, customers, receipts…" aria-label="Search" value="<?= htmlspecialchars((string)($_GET['q'] ?? '')) ?>" />
+    <form class="topbar-search d-none d-md-block" role="search" action="<?= $tb_e($BASE_URL) ?>/modules/search.php" method="get">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+        <input class="form-control" name="q" type="search" placeholder="Search products, customers, receipts" aria-label="Search" value="<?= $tb_e($_GET['q'] ?? '') ?>">
+      </div>
     </form>
+    <a class="topbar-btn d-md-none" href="<?= $tb_e($BASE_URL) ?>/modules/search.php" aria-label="Search"><i class="bi bi-search" aria-hidden="true"></i></a>
 
-    <!-- Messages -->
-    <a class="btn btn-outline-secondary btn-sm position-relative" href="<?= htmlspecialchars($BASE_URL) ?>/modules/messaging/inbox.php" title="Messages">
-      <i class="bi bi-envelope"></i>
-    <?php if ($unread_messages > 0): ?>
-        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary">
-          <?= $unread_messages ?>
-        </span>
-      <?php endif; ?>
+    <div class="dropdown">
+      <button class="topbar-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications<?= $tb_alert_total ? ', ' . $tb_alert_total . ' need attention' : '' ?>">
+        <i class="bi bi-bell" aria-hidden="true"></i>
+        <?php if ($tb_alert_total > 0): ?><span class="badge rounded-pill text-bg-danger"><?= $tb_alert_total > 99 ? '99+' : $tb_alert_total ?></span><?php endif; ?>
+      </button>
+      <div class="dropdown-menu dropdown-menu-end p-0" style="width:min(340px,92vw)">
+        <div class="px-3 py-2 fw-semibold border-bottom">Notifications</div>
+        <?php if (!$tb_alerts): ?>
+          <div class="px-3 py-3 text-muted small">Nothing needs attention.</div>
+        <?php else: foreach (array_slice($tb_alerts, 0, 6) as $tb_a): ?>
+          <a class="dropdown-item d-flex align-items-center gap-2 py-2 text-wrap" href="<?= $tb_e($tb_a['href']) ?>">
+            <i class="bi <?= $tb_e($tb_a['icon']) ?> text-<?= $tb_e($tb_a['level']) ?>" aria-hidden="true"></i>
+            <span class="flex-grow-1 small"><span class="fw-semibold d-block"><?= $tb_e($tb_a['title']) ?></span><?= $tb_e($tb_a['detail']) ?></span>
+          </a>
+        <?php endforeach; endif; ?>
+        <a class="dropdown-item text-center small border-top py-2" href="<?= $tb_e($BASE_URL) ?>/modules/notifications.php">View all</a>
+      </div>
+    </div>
+
+    <a class="topbar-btn" href="<?= $tb_e($BASE_URL) ?>/modules/messaging/inbox.php" aria-label="Messages<?= $unread_messages ? ', ' . $unread_messages . ' unread' : '' ?>">
+      <i class="bi bi-envelope" aria-hidden="true"></i>
+      <?php if ($unread_messages > 0): ?><span class="badge rounded-pill text-bg-primary"><?= $unread_messages > 99 ? '99+' : $unread_messages ?></span><?php endif; ?>
     </a>
 
-    <!-- Quick actions -->
     <div class="dropdown">
-  <button
-    class="btn btn-outline-secondary btn-sm dropdown-toggle d-flex align-items-center gap-2"
-    data-bs-toggle="dropdown"
-    aria-expanded="false"
-  >
-    <div class="avatar-mini d-flex align-items-center justify-content-center bg-primary text-white overflow-hidden">
-      <?php if (!empty($_SESSION['user']['profile_photo'])): ?>
-        <img src="<?= htmlspecialchars($GLOBALS['BASE_URL'] . '/' . $_SESSION['user']['profile_photo']) ?>" 
-             alt="Profile" 
-             class="w-100 h-100 object-fit-cover"
-             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-        <i class="bi bi-person" style="display: none;"></i>
-      <?php else: ?>
-        <i class="bi bi-person"></i>
-      <?php endif; ?>
+      <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 ps-1" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu">
+        <span class="avatar-mini d-flex align-items-center justify-content-center overflow-hidden">
+          <?php if (!empty($tb_user['profile_photo'])): ?>
+            <img src="<?= $tb_e($BASE_URL . '/' . ltrim((string)$tb_user['profile_photo'], '/')) ?>" alt="" class="w-100 h-100 object-fit-cover">
+          <?php else: ?>
+            <i class="bi bi-person" aria-hidden="true"></i>
+          <?php endif; ?>
+        </span>
+        <span class="d-none d-md-inline"><?= $tb_e($tb_user['username'] ?? 'User') ?></span>
+        <i class="bi bi-chevron-down small d-none d-md-inline" aria-hidden="true"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><div class="dropdown-item-text">
+          <div class="fw-semibold"><?= $tb_e($tb_user['full_name'] ?? ($tb_user['username'] ?? '')) ?></div>
+          <div class="small text-muted"><?= $tb_e(ucwords(str_replace('_', ' ', (string)($current_user_role ?? ($tb_user['role'] ?? ''))))) ?></div>
+        </div></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="<?= $tb_e($BASE_URL) ?>/modules/profile/my_profile.php"><i class="bi bi-person me-2" aria-hidden="true"></i>My profile</a></li>
+        <li><a class="dropdown-item" href="<?= $tb_e($BASE_URL) ?>/modules/profile/change_password.php"><i class="bi bi-key me-2" aria-hidden="true"></i>Change password</a></li>
+        <li><a class="dropdown-item" href="<?= $tb_e($BASE_URL) ?>/modules/messaging/inbox.php"><i class="bi bi-inbox me-2" aria-hidden="true"></i>Inbox</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="<?= $tb_e($BASE_URL) ?>/logout.php"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Sign out</a></li>
+      </ul>
     </div>
-    <span class="d-none d-md-inline">
-      <?= htmlspecialchars($_SESSION['user']['username'] ?? 'User') ?>
-    </span>
-  </button>
-
-  <ul class="dropdown-menu dropdown-menu-end">
-    <li>
-      <div class="dropdown-item-text small text-muted">
-        <?= htmlspecialchars($current_user_role ?? '') ?>
-      </div>
-    </li>
-
-    <li><hr class="dropdown-divider"></li>
-
-    <li>
-      <a class="dropdown-item" href="<?= htmlspecialchars($BASE_URL) ?>/modules/profile/my_profile.php">
-        My Profile
-      </a>
-    </li>
-
-    <li>
-      <a class="dropdown-item" href="<?= htmlspecialchars($BASE_URL) ?>/modules/profile/change_password.php">
-        Change Password
-      </a>
-    </li>
-
-    <li><hr class="dropdown-divider"></li>
-
-    <li>
-      <div class="dropdown-header text-muted small">Messaging</div>
-    </li>
-
-    <li>
-      <a class="dropdown-item" href="<?= htmlspecialchars($BASE_URL) ?>/modules/messaging/inbox.php">
-        <i class="bi bi-inbox me-2"></i> Inbox
-      </a>
-    </li>
-
-    <li>
-      <a class="dropdown-item" href="<?= htmlspecialchars($BASE_URL) ?>/modules/messaging/send.php">
-        <i class="bi bi-send me-2"></i> Send Message
-      </a>
-    </li>
-
-    <li><hr class="dropdown-divider"></li>
-
-    <li>
-      <a class="dropdown-item text-danger" href="<?= htmlspecialchars($BASE_URL) ?>/logout.php">
-        Logout
-      </a>
-    </li>
-  </ul>
-</div>
-
   </div>
 </header>
+<span id="bm-main"></span>

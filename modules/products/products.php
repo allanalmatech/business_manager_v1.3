@@ -14,7 +14,7 @@ $BASE_URL = $GLOBALS['BASE_URL'] ?? '';
 $page_title = "Products";
 $page_subtitle = "Manage products, units, and stock";
 
-$extra_js = ["assets/js/app.js"]; // optional
+$extra_js = [];
 
 require_once __DIR__ . '/../../templates/layout/header.php';
 ?>

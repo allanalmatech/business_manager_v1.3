@@ -1,145 +1,76 @@
-// assets/js/sidebar.js
+// assets/js/sidebar.js — menu groups, desktop rail, mobile drawer
 (function () {
-  const btnToggle = document.getElementById("btnSidebarToggle");
-  const btnOpen = document.getElementById("btnSidebarOpen");
+  'use strict';
+  var body = document.body;
+  var sidebar = document.getElementById('appSidebar');
+  if (!sidebar) return;
+  var backdrop = document.getElementById('sidebarBackdrop');
+  var desktop = window.matchMedia('(min-width: 992px)');
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
 
-  if (btnToggle) {
-    btnToggle.addEventListener("click", () => {
-      document.body.classList.toggle("sidebar-collapsed");
-      localStorage.setItem("sidebarCollapsed", document.body.classList.contains("sidebar-collapsed") ? "1" : "0");
-    });
+  // Groups: one open at a time; the group holding the current page starts open
+  var groups = Array.prototype.slice.call(sidebar.querySelectorAll('.sb-group'));
+  function setOpen(group, open) {
+    group.classList.toggle('open', open);
+    var btn = group.querySelector('.sb-toggle');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
-
-  if (btnOpen) {
-    btnOpen.addEventListener("click", () => {
-      document.body.classList.toggle("sidebar-open");
-    });
+  if (!sidebar.querySelector('.sb-group.has-active')) {
+    var remembered = store.get('bm.sidebar.group');
+    groups.forEach(function (g) { if (g.dataset.group === remembered) setOpen(g, true); });
   }
-
-  // Restore desktop collapse state
-  const saved = localStorage.getItem("sidebarCollapsed");
-  if (saved === "1") document.body.classList.add("sidebar-collapsed");
-
-  /**
-   * Enhanced Hover Logic for Collapsed Sidebar
-   */
-  const navGroups = document.querySelectorAll('.app-sidebar .nav-link-group');
-  
-  navGroups.forEach(group => {
-    const submenu = group.nextElementSibling; // The .nav-sub div
-    if (!submenu || !submenu.classList.contains('nav-sub')) return;
-
-    let hoverTimeout;
-
-    const showSubmenu = () => {
-      if (!document.body.classList.contains('sidebar-collapsed')) return;
-      
-      clearTimeout(hoverTimeout);
-      
-      // Position the submenu
-      const rect = group.getBoundingClientRect();
-      submenu.style.position = 'fixed';
-      submenu.style.top = rect.top + 'px';
-      submenu.style.left = '80px';
-      submenu.style.display = 'block';
-      submenu.style.opacity = '1';
-      submenu.style.visibility = 'visible';
-      submenu.style.height = 'auto';
-      submenu.classList.add('show'); // Bootstrap class
-    };
-
-    const hideSubmenu = () => {
-      if (!document.body.classList.contains('sidebar-collapsed')) return;
-      
-      hoverTimeout = setTimeout(() => {
-        submenu.style.display = '';
-        submenu.style.position = '';
-        submenu.style.top = '';
-        submenu.style.left = '';
-        submenu.style.opacity = '';
-        submenu.style.visibility = '';
-        submenu.classList.remove('show');
-      }, 100);
-    };
-
-    group.addEventListener('mouseenter', showSubmenu);
-    group.addEventListener('mouseleave', hideSubmenu);
-    
-    submenu.addEventListener('mouseenter', () => clearTimeout(hoverTimeout));
-    submenu.addEventListener('mouseleave', hideSubmenu);
-  });
-
-  // Close on overlay click (mobile)
-  document.addEventListener("click", (e) => {
-    if (!document.body.classList.contains("sidebar-open")) return;
-    const sidebar = document.getElementById("appSidebar");
-    const isClickInside = sidebar && sidebar.contains(e.target);
-    const isHamburger = e.target && (e.target.id === "btnSidebarOpen");
-    if (!isClickInside && !isHamburger) {
-      document.body.classList.remove("sidebar-open");
-    }
-  });
-
-  // Highlight active link and keep parent collapse open
-  const currentPath = window.location.pathname.replace(/\/+$/, '');
-  const sidebarLinks = document.querySelectorAll('#appSidebar a.nav-link, #appSidebar a.nav-sublink');
-  let activeLink = null;
-
-  for (const a of sidebarLinks) {
-    let href = a.getAttribute('href') || '';
-    if (href.startsWith('/')) {
-      href = href.replace(/\/+$/, '');
-    } else {
-      try {
-        href = new URL(href, window.location.href).pathname.replace(/\/+$/, '');
-      } catch(e) {}
-    }
-    if (href && currentPath === href) {
-      activeLink = a;
-      break;
-    }
-  }
-
-  if (activeLink) {
-    activeLink.classList.add('active');
-    const parentCollapse = activeLink.closest('.collapse.nav-sub');
-    if (parentCollapse && !document.body.classList.contains('sidebar-collapsed')) {
-      const bsCollapse = new bootstrap.Collapse(parentCollapse, { toggle: false });
-      bsCollapse.show();
-      const btn = document.querySelector(`[data-bs-target="#${parentCollapse.id}"]`);
-      if (btn) btn.setAttribute('aria-expanded', 'true');
-    }
-  }
-
-  // Initialize tooltips for collapsed state
-  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-  tooltipTriggerList.map(function (tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl, {
-      customClass: 'sidebar-tooltip',
-      trigger: 'hover'
+  groups.forEach(function (group) {
+    var btn = group.querySelector('.sb-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      if (desktop.matches && body.classList.contains('sidebar-collapsed')) return; // fly-out handles it
+      var willOpen = !group.classList.contains('open');
+      groups.forEach(function (g) { if (g !== group) setOpen(g, false); });
+      setOpen(group, willOpen);
+      store.set('bm.sidebar.group', willOpen ? group.dataset.group : '');
     });
   });
+  var current = sidebar.querySelector('.active');
+  if (current && current.scrollIntoView) current.scrollIntoView({ block: 'nearest' });
 
-  //intelligent vertical positioning for submenus
-  document.addEventListener('mouseover', e => {
-    const wrapper = e.target.closest('.nav-group-wrapper');
-    if (!wrapper || !document.body.classList.contains('sidebar-collapsed')) return;
-
-    const submenu = wrapper.querySelector('.nav-sub');
-    if (!submenu) return;
-
-    const rect = wrapper.getBoundingClientRect();
-    const submenuHeight = submenu.offsetHeight;
-    const viewportHeight = window.innerHeight;
-
-    // Default: align top with hovered item
-    let top = rect.top;
-
-    // If submenu would overflow bottom, shift it up
-    if (top + submenuHeight > viewportHeight - 10) {
-      top = Math.max(10, viewportHeight - submenuHeight - 10);
-    }
-
-    submenu.style.top = `${top}px`;
+  // Desktop rail
+  if (store.get('bm.sidebar.collapsed') === '1') body.classList.add('sidebar-collapsed');
+  var btnToggle = document.getElementById('btnSidebarToggle');
+  if (btnToggle) btnToggle.addEventListener('click', function () {
+    var on = body.classList.toggle('sidebar-collapsed');
+    store.set('bm.sidebar.collapsed', on ? '1' : '0');
+    btnToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
+
+  // Fly-outs near the bottom of the screen open upward so they stay visible
+  groups.forEach(function (group) {
+    group.addEventListener('mouseenter', place);
+    group.addEventListener('focusin', place);
+    function place() {
+      if (!body.classList.contains('sidebar-collapsed')) return;
+      var sub = group.querySelector('.sb-sub');
+      sub.style.top = '0px';
+      var overflow = group.getBoundingClientRect().top + sub.offsetHeight - window.innerHeight + 12;
+      if (overflow > 0) sub.style.top = (-overflow) + 'px';
+    }
+  });
+
+  // Drawer
+  var btnOpen = document.getElementById('btnSidebarOpen');
+  var btnClose = document.getElementById('btnSidebarClose');
+  function drawer(open) {
+    body.classList.toggle('sidebar-open', open);
+    if (backdrop) backdrop.hidden = !open;
+    if (btnOpen) btnOpen.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) { var first = sidebar.querySelector('.sb-link'); if (first) first.focus(); }
+    else if (btnOpen && document.activeElement && sidebar.contains(document.activeElement)) btnOpen.focus();
+  }
+  if (btnOpen) btnOpen.addEventListener('click', function () { drawer(!body.classList.contains('sidebar-open')); });
+  if (btnClose) btnClose.addEventListener('click', function () { drawer(false); });
+  if (backdrop) backdrop.addEventListener('click', function () { drawer(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && body.classList.contains('sidebar-open')) drawer(false); });
+  desktop.addEventListener('change', function () { drawer(false); });
 })();

@@ -64,7 +64,7 @@ $stmt->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sale Receipt #<?= htmlspecialchars($sale['doc_no']) ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="<?= htmlspecialchars($GLOBALS['BASE_URL'] ?? '') ?>/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
     <style>
         @media print {
             .no-print { display: none !important; }
@@ -280,15 +280,15 @@ $stmt->close();
                         <!-- Action Buttons -->
                         <div class="no-print text-center mt-4">
                             <button onclick="window.print()" class="btn btn-primary me-2">
-                                <i class="fas fa-print"></i> Print Receipt
+                                <i class="bi bi-printer"></i> Print Receipt
                             </button>
                             <?php if ($sale['status'] !== 'confirmed'): ?>
                             <button onclick="editSale()" class="btn btn-warning me-2">
-                                <i class="fas fa-edit"></i> Edit Sale
+                                <i class="bi bi-pencil"></i> Edit Sale
                             </button>
                             <?php endif; ?>
                             <a href="pos.php" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Back to POS
+                                <i class="bi bi-arrow-left"></i> Back to POS
                             </a>
                         </div>
                     </div>
@@ -297,8 +297,7 @@ $stmt->close();
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <script src="<?= htmlspecialchars($GLOBALS['BASE_URL'] ?? '') ?>/assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
     
     <script>
     // Track view and update display

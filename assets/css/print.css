@@ -1,0 +1,17 @@
+/* assets/css/print.css — paper output for any page in the app */
+@media print {
+  :root, [data-theme] { --bm-bg: #fff; --bm-surface: #fff; --bm-surface-2: #fff; --bm-text: #000; --bm-muted: #333; --bm-border: #999; color-scheme: light; }
+  body { background: #fff !important; color: #000 !important; font-size: 11pt; }
+  .app-sidebar, .app-topbar, .sidebar-backdrop, .bm-toasts, .btn, .pagination, form[role="search"], .no-print, .d-print-none { display: none !important; }
+  .app-content { margin: 0 !important; }
+  .page-wrap, .page-wrap > .container-fluid { padding: 0 !important; max-width: none; animation: none; }
+  .card { box-shadow: none !important; border: 1px solid #999 !important; break-inside: avoid; }
+  table { break-inside: auto; } tr { break-inside: avoid; }
+  thead { display: table-header-group; }
+  a { color: #000 !important; text-decoration: none !important; }
+  table.bm-stack, table.bm-stack tbody { display: table; } table.bm-stack tr { display: table-row; } table.bm-stack td { display: table-cell; }
+}
+/* Thermal receipts: add class="receipt-58" or "receipt-80" on the receipt wrapper */
+.receipt-58 { width: 58mm; } .receipt-80 { width: 80mm; }
+.receipt-58, .receipt-80 { font: 12px/1.35 ui-monospace, "Courier New", monospace; color: #000; background: #fff; padding: 2mm; }
+@media print { @page { margin: 8mm; } .receipt-58, .receipt-80 { padding: 0; } }

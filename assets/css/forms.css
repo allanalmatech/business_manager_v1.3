@@ -1,0 +1,54 @@
+/* assets/css/forms.css */
+.form-control, .form-select, .input-group-text {
+  background-color: var(--bm-surface); color: var(--bm-text);
+  border-color: var(--bm-control-border); border-radius: var(--bm-radius-sm);
+  min-height: 40px;
+}
+.form-control-sm, .form-select-sm { min-height: 34px; }
+textarea.form-control { min-height: 84px; }
+.form-control::placeholder { color: var(--bm-muted); opacity: 1; }
+.form-control:focus, .form-select:focus, .form-check-input:focus {
+  background-color: var(--bm-surface); color: var(--bm-text);
+  border-color: var(--bm-primary); box-shadow: 0 0 0 .2rem rgba(var(--bm-primary-rgb), .28);
+}
+.form-control:disabled, .form-select:disabled, .form-control[readonly] { background-color: var(--bm-surface-2); color: var(--bm-muted); }
+.input-group-text { background-color: var(--bm-surface-2); color: var(--bm-muted); }
+.form-label { font-weight: 600; font-size: .88rem; margin-bottom: .3rem; color: var(--bm-text); }
+.form-check-input { background-color: var(--bm-surface); border-color: var(--bm-control-border); width: 1.15em; height: 1.15em; }
+.form-check-input:checked { background-color: var(--bm-primary); border-color: var(--bm-primary); }
+.form-switch .form-check-input { width: 2.4em; height: 1.3em; cursor: pointer; }
+.form-check-label { cursor: pointer; }
+
+/* Phones: 16px inputs stop iOS zooming the page on focus */
+@media (max-width: 575.98px) {
+  .form-control, .form-select { font-size: 16px; }
+}
+
+/* Settings: grouped cards with one row per option */
+.bm-settings { display: grid; gap: var(--bm-space); grid-template-columns: minmax(0, 220px) minmax(0, 1fr); align-items: start; }
+.bm-settings-nav { position: sticky; top: calc(var(--bm-topbar-h) + 12px); display: grid; gap: 4px; }
+.bm-settings-nav a {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--bm-radius-sm);
+  color: var(--bm-text); text-decoration: none; font-weight: 500;
+  transition: background var(--bm-dur) var(--bm-ease);
+}
+.bm-settings-nav a:hover { background: var(--bm-surface-2); }
+.bm-settings-nav a.active { background: var(--bm-primary); color: var(--bm-on-primary); }
+.bm-setting-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: 8px 20px; align-items: center;
+  padding: 14px 0; border-top: 1px solid var(--bm-border);
+}
+.bm-setting-row:first-child { border-top: 0; padding-top: 0; }
+.bm-setting-row .bm-setting-name { font-weight: 600; }
+.bm-setting-row .bm-setting-help { color: var(--bm-muted); font-size: .85rem; }
+.bm-setting-row .bm-setting-control { justify-self: end; width: 100%; display: flex; justify-content: flex-end; }
+.bm-setting-row .bm-setting-control > .form-control, .bm-setting-row .bm-setting-control > .form-select { width: 100%; }
+.bm-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 991.98px) {
+  .bm-settings { grid-template-columns: minmax(0, 1fr); }
+  .bm-settings-nav { position: static; grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+}
+@media (max-width: 575.98px) {
+  .bm-setting-row { grid-template-columns: minmax(0, 1fr); }
+  .bm-setting-row .bm-setting-control { justify-content: flex-start; }
+}

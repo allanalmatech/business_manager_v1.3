@@ -643,6 +643,96 @@
     if (payAmount) payAmount.value = "";
   }
 
+  // ---------- Hold / resume a sale (kept on this device) ----------
+  const HOLD_KEY = "bm.pos.held";
+  function heldList() {
+    try { return JSON.parse(localStorage.getItem(HOLD_KEY) || "[]") || []; } catch (e) { return []; }
+  }
+  function saveHeld(list) {
+    try { localStorage.setItem(HOLD_KEY, JSON.stringify(list)); } catch (e) {}
+    renderHeld();
+  }
+  function renderHeld() {
+    const list = heldList();
+    const badge = document.getElementById("heldCount");
+    const menu = document.getElementById("heldMenu");
+    if (badge) { badge.textContent = String(list.length); badge.classList.toggle("d-none", list.length === 0); }
+    if (!menu) return;
+    menu.innerHTML = "";
+    if (!list.length) {
+      menu.innerHTML = '<li><span class="dropdown-item-text text-muted small">No held sales</span></li>';
+      return;
+    }
+    list.forEach((h, i) => {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "dropdown-item d-flex justify-content-between gap-3";
+      const total = h.cart.reduce((sum, it) => sum + lineTotal(it), 0);
+      const left = document.createElement("span"); left.textContent = (h.label || "Sale") + " · " + h.cart.length + " item(s)";
+      const right = document.createElement("span"); right.className = "text-muted"; right.textContent = total.toLocaleString();
+      b.appendChild(left); b.appendChild(right);
+      b.addEventListener("click", () => resumeSale(i));
+      li.appendChild(b); menu.appendChild(li);
+    });
+  }
+  function holdSale() {
+    if (!cart.length) { window.BM && BM.toast("Nothing to hold: the cart is empty.", "warning"); return; }
+    const list = heldList();
+    const t = new Date();
+    list.push({
+      label: t.getHours().toString().padStart(2, "0") + ":" + t.getMinutes().toString().padStart(2, "0"),
+      cart: cart, payments: payments, customer_id: elCustomer ? elCustomer.value : ""
+    });
+    saveHeld(list);
+    newSale();
+    window.BM && BM.toast("Sale held. Find it under Held.", "success");
+  }
+  function resumeSale(i) {
+    const list = heldList();
+    const h = list[i];
+    if (!h) return;
+    if (cart.length) { window.BM && BM.toast("Finish or hold the current sale first.", "warning"); return; }
+    list.splice(i, 1);
+    saveHeld(list);
+    cart = h.cart || [];
+    payments = h.payments || [];
+    if (elCustomer && h.customer_id !== undefined) elCustomer.value = h.customer_id;
+    renderCart();
+    renderPayments();
+  }
+
+  // ---------- Keyboard: F2 search, F4 payment, F8 hold, F9 complete ----------
+  function wireShortcuts() {
+    document.addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || document.querySelector(".modal.show")) return;
+      const map = { F2: () => elSearchInput && elSearchInput.focus(), F4: () => payAmount && payAmount.focus(),
+                    F8: holdSale, F9: () => { const b = document.getElementById("btnConfirm"); if (b && !b.disabled) b.click(); } };
+      if (map[e.key]) { e.preventDefault(); map[e.key](); }
+    });
+    const btnHold = document.getElementById("btnHoldSale");
+    if (btnHold) btnHold.addEventListener("click", holdSale);
+    renderHeld();
+
+    // Phones: a bar that always shows the total and jumps to the cart
+    const bar = document.getElementById("posCartBar");
+    const grand = document.getElementById("t_grand");
+    const count = document.getElementById("cartCount");
+    if (bar && grand && count) {
+      const sync = () => {
+        bar.querySelector("[data-total]").textContent = grand.textContent;
+        bar.querySelector("[data-count]").textContent = count.textContent;
+        bar.classList.toggle("is-empty", cart.length === 0);
+      };
+      new MutationObserver(sync).observe(grand, { childList: true, characterData: true, subtree: true });
+      new MutationObserver(sync).observe(count, { childList: true, characterData: true, subtree: true });
+      sync();
+      bar.querySelector("button").addEventListener("click", () => {
+        const right = document.querySelector(".pos-right");
+        if (right) right.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }
+
   // ---------- Events ----------
   function wireEvents() {
     elSearchInput?.addEventListener("input", doSearch);
@@ -769,6 +859,7 @@
   }
 
   function init() {
+    wireShortcuts();
     wireEvents();
     renderCart();
     renderPayments();

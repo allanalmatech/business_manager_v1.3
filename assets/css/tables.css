@@ -1,0 +1,40 @@
+/* assets/css/tables.css */
+.table {
+  --bs-table-bg: transparent; --bs-table-color: var(--bm-text); --bs-table-border-color: var(--bm-border);
+  --bs-table-striped-bg: var(--bm-surface-2); --bs-table-striped-color: var(--bm-text);
+  --bs-table-hover-bg: var(--bm-surface-2); --bs-table-hover-color: var(--bm-text);
+  font-variant-numeric: tabular-nums; margin-bottom: 0;
+}
+.table > thead > tr > th, .table-light, .table > thead.table-light > tr > th {
+  --bs-table-bg: var(--bm-surface-2); --bs-table-color: var(--bm-muted);
+  background-color: var(--bm-surface-2); color: var(--bm-muted);
+  font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap;
+  border-bottom-color: var(--bm-border);
+}
+.table td, .table th { vertical-align: middle; padding: .65rem .75rem; }
+.table-responsive { border-radius: var(--bm-radius-sm); -webkit-overflow-scrolling: touch; }
+
+/* Phones: each row becomes a card; ui.js copies the column headings into data-label */
+@media (max-width: 767.98px) {
+  table.bm-stack { border: 0; }
+  table.bm-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.bm-stack, table.bm-stack tbody, table.bm-stack tr, table.bm-stack td { display: block; width: 100%; }
+  table.bm-stack tr {
+    background: var(--bm-surface); border: 1px solid var(--bm-border); border-radius: var(--bm-radius-sm);
+    padding: 6px 12px; margin-bottom: 10px;
+  }
+  table.bm-stack td {
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    padding: 7px 0; border: 0; border-bottom: 1px solid var(--bm-border); text-align: right; min-height: 36px;
+    white-space: normal; overflow-wrap: anywhere;
+  }
+  table.bm-stack td:last-child { border-bottom: 0; }
+  table.bm-stack td::before {
+    content: attr(data-label); flex: 0 0 40%; text-align: left;
+    color: var(--bm-muted); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+  }
+  table.bm-stack td[data-label=""]::before, table.bm-stack td[colspan]::before { content: none; }
+  table.bm-stack td[data-label=""], table.bm-stack td[colspan] { justify-content: center; text-align: center; }
+  table.bm-stack tfoot { display: block; }
+  .table-responsive:has(> table.bm-stack) { overflow: visible; }
+}

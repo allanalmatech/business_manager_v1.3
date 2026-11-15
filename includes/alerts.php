@@ -26,7 +26,7 @@ function alerts_for_user(mysqli $db, string $baseUrl): array
     if ($can('products.view')) {
         $n = $count($db, "SELECT COUNT(*) FROM stock_by_location s JOIN products p ON p.id = s.product_id
                           WHERE p.is_active = 1 AND s.low_level_base > 0 AND s.qty_base <= s.low_level_base");
-        $add($out, 'low_stock', $n, 'Low stock', "$n product(s) are at or below their reorder level.", 'warning', "$baseUrl/modules/stores/low_stock.php", 'bi-box-seam');
+        $add($out, 'low_stock', $n, 'Low stock', "$n product(s) are at or below their reorder level.", 'warning', "$baseUrl/modules/products/stock_levels.php", 'bi-box-seam');
 
         $n = $count($db, "SELECT COUNT(*) FROM products WHERE is_active = 1 AND track_expiry = 1 AND expiry_date IS NOT NULL AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)");
         $add($out, 'expiring', $n, 'Expiring soon', "$n product(s) expire within 30 days.", 'warning', "$baseUrl/modules/products/products.php", 'bi-hourglass-split');

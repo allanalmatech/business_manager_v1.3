@@ -55,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'role'    => (string)$user['role'],
                 'username'=> (string)$user['username'],
                 'name'    => (string)$user['full_name'],
+                'full_name' => (string)$user['full_name'],
             ];
 
             // update last login
@@ -79,10 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Login</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="<?= htmlspecialchars($GLOBALS['BASE_URL'] ?? '') ?>/assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
 
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="<?= htmlspecialchars($GLOBALS['BASE_URL'] ?? '') ?>/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
 
@@ -104,8 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     overflow:hidden;
   }
   .auth-aside{
-    background: linear-gradient(135deg, rgba(13,110,253,.85), rgba(111,66,193,.85)), 
-                url('https://images.unsplash.com/photo-1557804506-669a67965ba0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1974&q=80') center/cover;
+    background: linear-gradient(135deg, #1f5fd0, #5b3cc4);
     color:#fff;
     padding: 1.75rem;
   }
@@ -262,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <h5 class="mb-0 fw-bold">Sign in</h5>
                     <div class="text-muted small">Enter your credentials to continue</div>
                   </div>
-                  <span class="badge bg-light text-dark border">v1.2</span>
+                  <span class="badge bg-light text-dark border">v<?= htmlspecialchars(defined("APP_VERSION") ? APP_VERSION : "") ?></span>
                 </div>
 
                 <?php if ($error): ?>
@@ -348,7 +347,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Visual feedback
         const originalIcon = btn.innerHTML;
         btn.classList.add('copied');
-        btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        btn.innerHTML = '<i class="bi bi-check-lg"></i>';
         
         // Optional clipboard copy
         try {
