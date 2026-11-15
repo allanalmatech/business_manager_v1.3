@@ -323,10 +323,11 @@ function sale_create(mysqli $db, array $in, int $uid, array $opts = []): array
 
   // Shift: link the sale to the cashier's open shift; required when the setting says so
   $shift = shift_current($db, $uid);
-  if (!$shift && !$offline && setting_bool('shift_required') && !is_super_admin()) {
+  if (!$shift && !$offline && shifts_available($db) && setting_bool('shift_required') && !is_super_admin()) {
     throw new SaleError('Open a shift before selling (Sales → Shifts & cash-up).', 409);
   }
   $shift_id = $shift ? (int)$shift['id'] : null;
+  $hasShiftCol = table_has_column($db, 'sales', 'shift_id');
 
   // payments: only known methods; anything tendered above the total is change, not income
   $allowedMethods = ['cash', 'mobile_money', 'bank'];
@@ -422,16 +423,17 @@ function sale_create(mysqli $db, array $in, int $uid, array $opts = []): array
       (doc_type, doc_no, selling_location_id, customer_id, pricing_mode,
        status, payment_status, currency,
        subtotal, discount_total, tax_total, grand_total,
-       amount_paid, balance, notes, created_by, has_b2b, shift_id, client_uuid, client_ref, review_note, created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,COALESCE(?, NOW()))");
+       amount_paid, balance, notes, created_by, has_b2b" . ($hasShiftCol ? ', shift_id' : '') . ", client_uuid, client_ref, review_note, created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?" . ($hasShiftCol ? ',?' : '') . ",?,?,?,COALESCE(?, NOW()))");
     if (!$stSale) throw new Exception('Prepare sale failed: ' . $db->error);
-    $stSale->bind_param(
-      'ssiissssddddddsiiissss',
-      $doc_type, $doc_no, $location_id, $customer_id, $pricing_mode,
+    $saleTypes = 'ssiissssddddddsii' . ($hasShiftCol ? 'i' : '') . 'ssss';
+    $saleArgs = [$doc_type, $doc_no, $location_id, $customer_id, $pricing_mode,
       $status, $payment_status, $currency,
       $subtotal, $discount_total, $tax_total, $grand_total,
-      $amount_paid, $balance, $notes, $uid, $has_b2b_flag, $shift_id, $client_uuid, $client_ref, $review_note, $sold_at
-    );
+      $amount_paid, $balance, $notes, $uid, $has_b2b_flag];
+    if ($hasShiftCol) $saleArgs[] = $shift_id;
+    array_push($saleArgs, $client_uuid, $client_ref, $review_note, $sold_at);
+    $stSale->bind_param($saleTypes, ...$saleArgs);
     if (!$stSale->execute()) throw new Exception('Insert sale failed: ' . $stSale->error);
     $sale_id = (int)$stSale->insert_id;
     $stSale->close();

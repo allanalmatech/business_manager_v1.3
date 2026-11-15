@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/includes/bootstrap.php';
+require_once dirname(__DIR__, 2) . '/includes/db_feature.php';
 require_once dirname(__DIR__, 2) . '/includes/auth.php';
 require_once dirname(__DIR__, 2) . '/includes/rbac.php';
 require_once dirname(__DIR__, 2) . '/includes/helpers.php';
@@ -11,6 +12,8 @@ require_once dirname(__DIR__, 2) . '/includes/settings.php';
 require_once dirname(__DIR__, 2) . '/includes/shifts.php';
 
 require_login();
+
+require_db_tables($GLOBALS['db'], ['shifts', 'shift_cash_movements'], 'Shifts & cash-up');
 require_permission('pos.create');
 
 $db = $GLOBALS['db'];

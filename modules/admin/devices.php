@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/includes/bootstrap.php';
+require_once dirname(__DIR__, 2) . '/includes/db_feature.php';
 require_once dirname(__DIR__, 2) . '/includes/auth.php';
 require_once dirname(__DIR__, 2) . '/includes/rbac.php';
 require_once dirname(__DIR__, 2) . '/includes/helpers.php';
 require_once dirname(__DIR__, 2) . '/includes/audit.php';
 
 require_super_admin();
+
+require_db_tables($GLOBALS['db'], ['api_devices', 'sync_changes'], 'Devices');
 $db = $GLOBALS['db'];
 $BASE_URL = $GLOBALS['BASE_URL'] ?? '';
 

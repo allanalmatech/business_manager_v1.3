@@ -2,9 +2,22 @@
 // includes/shifts.php
 declare(strict_types=1);
 
+/** True when this install has the shift tables. Selling must not depend on them. */
+function shifts_available(mysqli $db): bool
+{
+    static $ok = null;
+    if ($ok === null) {
+        $r = @$db->query("SHOW TABLES LIKE 'shifts'");
+        $ok = (bool)($r && $r->num_rows > 0);
+    }
+    return $ok;
+}
+
 function shift_current(mysqli $db, int $userId): ?array
 {
+    if (!shifts_available($db)) return null;
     $st = $db->prepare("SELECT * FROM shifts WHERE user_id = ? AND status = 'open' ORDER BY id DESC LIMIT 1");
+    if (!$st) return null;
     $st->bind_param('i', $userId);
     $st->execute();
     $row = $st->get_result()->fetch_assoc();

@@ -87,3 +87,39 @@ function migrations_run(mysqli $db): array
     }
     return $done;
 }
+
+/**
+ * Applies anything pending, once per request, without anyone pressing a button.
+ * New code and an old database can otherwise sit out of step after a git pull,
+ * and a till that cannot record a sale is the worst possible way to find out.
+ *
+ * One cheap query in the common case. A database lock keeps two requests from
+ * running the same step twice, and a failure is logged rather than thrown, so a
+ * database the web user cannot alter degrades to the manual button instead of
+ * taking the whole site down.
+ */
+function migrations_auto(mysqli $db): void
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    $r = @$db->query("SELECT COUNT(*) FROM schema_migrations");
+    $applied = $r ? (int)$r->fetch_row()[0] : -1;
+    if ($applied === count(migrations_all())) return;
+
+    // Before the first install there is nothing to migrate
+    $t = @$db->query("SHOW TABLES LIKE 'users'");
+    if (!$t || $t->num_rows === 0) return;
+
+    $lock = @$db->query("SELECT GET_LOCK('bm_schema_update', 3)");
+    if (!$lock || (int)($lock->fetch_row()[0] ?? 0) !== 1) return;
+    try {
+        $done = migrations_run($db);
+        if ($done) error_log('[migrations] applied automatically: ' . implode(', ', $done));
+    } catch (Throwable $e) {
+        error_log('[migrations] automatic update failed: ' . $e->getMessage());
+    } finally {
+        @$db->query("SELECT RELEASE_LOCK('bm_schema_update')");
+    }
+}

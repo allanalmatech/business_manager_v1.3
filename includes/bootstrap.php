@@ -120,6 +120,13 @@ if ($bmStateless) {
 // Make DB accessible
 $GLOBALS['db'] = $mysqli;
 
+// Keep the database in step with the code, so a pull that adds a column cannot
+// leave the till unable to save a sale.
+if (!defined('BM_SKIP_AUTO_MIGRATE')) {
+    require_once __DIR__ . '/migrations.php';
+    migrations_auto($mysqli);
+}
+
 // CSRF: one token per session, enforced for every signed-in write request
 require_once __DIR__ . '/csrf.php';
 if (!$bmStateless) {
