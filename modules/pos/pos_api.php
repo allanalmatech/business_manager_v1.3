@@ -50,6 +50,26 @@ function has_perm_local(string $p): bool {
   return function_exists('user_has_permission') ? (bool) user_has_permission($p) : true;
 }
 
+/** First usable image path for a product, or null. The column holds a JSON array. */
+function pos_thumb($imagesJson): ?string {
+  if ($imagesJson === null || $imagesJson === '') return null;
+  $list = json_decode((string)$imagesJson, true);
+  if (!is_array($list)) {
+    // Older rows sometimes hold a bare path rather than a JSON array
+    $bare = trim((string)$imagesJson);
+    return ($bare !== '' && $bare !== '[]') ? $bare : null;
+  }
+  foreach ($list as $img) {
+    if (is_string($img) && trim($img) !== '') return trim($img);
+    if (is_array($img)) {
+      foreach (['path', 'url', 'src', 'file'] as $k) {
+        if (!empty($img[$k]) && is_string($img[$k])) return trim($img[$k]);
+      }
+    }
+  }
+  return null;
+}
+
 /* ----------------- routing ----------------- */
 $action = (string)($_GET['action'] ?? '');
 
@@ -73,9 +93,13 @@ if ($action === 'search_products') {
 
   $like = '%' . $q . '%';
 
+  // Built to match the database in front of us: if an update has landed but the
+  // database step has not run yet, the till still searches by name and SKU.
+  $hasBarcode = table_has_column($db, 'products', 'barcode');
+
   $sql = "
     SELECT 
-      p.id, p.sku, p.barcode, p.name, 
+      p.id, p.sku, " . ($hasBarcode ? 'p.barcode,' : 'NULL AS barcode,') . " p.name, 
       p.images AS thumbnail,
       p.retail_price, p.wholesale_price,
       COALESCE(s.qty_base,0) AS stock_qty
@@ -83,15 +107,19 @@ if ($action === 'search_products') {
     LEFT JOIN stock_by_location s 
       ON s.product_id = p.id AND s.location_id = ?
     WHERE p.is_active = 1
-      AND (p.sku LIKE ? OR p.name LIKE ? OR p.barcode = ?)
-    ORDER BY (p.barcode = ?) DESC, (p.sku = ?) DESC, p.name ASC
+      AND (p.sku LIKE ? OR p.name LIKE ? " . ($hasBarcode ? 'OR p.barcode = ?' : '') . ")
+    ORDER BY " . ($hasBarcode ? '(p.barcode = ?) DESC,' : '') . " (p.sku = ?) DESC, p.name ASC
     LIMIT 20
   ";
 
   $st = $db->prepare($sql);
   if (!$st) pos_fail($db, 'search');
 
-  $st->bind_param('isssss', $location_id, $like, $like, $q, $q, $q);
+  if ($hasBarcode) {
+    $st->bind_param('isssss', $location_id, $like, $like, $q, $q, $q);
+  } else {
+    $st->bind_param('isss', $location_id, $like, $like, $q);
+  }
   $st->execute();
   $rs = $st->get_result();
 
@@ -101,8 +129,8 @@ if ($action === 'search_products') {
       'id' => (int)$r['id'],
       'sku' => (string)$r['sku'],
       'name' => (string)$r['name'],
-      'exact' => ($r['barcode'] !== null && $r['barcode'] === $q) || strcasecmp((string)$r['sku'], $q) === 0,
-      'thumbnail' => $r['thumbnail'],
+      'exact' => ($r['barcode'] !== null && $r['barcode'] === $q) || (mb_strlen($q) >= 4 && strcasecmp((string)$r['sku'], $q) === 0),
+      'thumbnail' => pos_thumb($r['thumbnail']),
       'retail_price' => (float)$r['retail_price'],
       'wholesale_price' => (float)$r['wholesale_price'],
       'stock_display' => 'Stock: ' . rtrim(rtrim(number_format((float)$r['stock_qty'], 3, '.', ''), '0'), '.'),
@@ -152,7 +180,7 @@ if ($action === 'quick_items') {
       'id' => (int)$r['id'],
       'sku' => (string)$r['sku'],
       'name' => (string)$r['name'],
-      'thumbnail' => $r['thumbnail'],
+      'thumbnail' => pos_thumb($r['thumbnail']),
       'retail_price' => (float)$r['retail_price'],
       'wholesale_price' => (float)$r['wholesale_price'],
       'stock_display' => 'Stock: ' . (string)$r['stock_qty'],

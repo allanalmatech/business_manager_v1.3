@@ -20,13 +20,31 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
+/* Two rows: what you do most (search, location) on top, categories below with
+   the whole width to scroll in, so chips are never clipped behind the search. */
 .pos-topbar {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 0.9fr;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "search actions"
+    "tabs   tabs";
+  gap: 10px 12px;
   padding: 12px;
-  border-bottom: 1px solid rgba(0,0,0,.08);
+  border-bottom: 1px solid var(--bm-border);
   background: var(--bm-bg);
+}
+.pos-topbar .pos-search { grid-area: search; }
+.pos-topbar .pos-header-actions { grid-area: actions; }
+.pos-topbar .pos-tabs-modern { grid-area: tabs; }
+
+@media (max-width: 575.98px) {
+  .pos-topbar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "search" "actions" "tabs";
+    padding: 10px;
+  }
+  .pos-topbar .pos-header-actions { justify-content: space-between; }
+  .pos-topbar .pos-header-actions .form-select { flex: 1 1 auto; width: auto !important; }
 }
 
 .pos-tabs {
@@ -60,17 +78,29 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(0,0,0,.12);
+  min-width: 0;
+  border: 1px solid var(--bm-control-border);
   background: var(--bm-surface);
   border-radius: 12px;
-  padding: 6px 10px;
+  padding: 8px 12px;
+  transition: border-color var(--bm-dur, 200ms) ease, box-shadow var(--bm-dur, 200ms) ease;
 }
+
+.pos-search:focus-within {
+  border-color: var(--bm-primary);
+  box-shadow: 0 0 0 .2rem rgba(var(--bm-primary-rgb), .25);
+}
+
+.pos-search > .bi { color: var(--bm-muted); flex: 0 0 auto; }
 
 .pos-search input {
   border: 0;
   outline: none;
   width: 100%;
-  font-size: 14px;
+  min-width: 0;
+  background: transparent;
+  color: var(--bm-text);
+  font-size: 15px;
 }
 
 .pos-meta {
@@ -177,15 +207,24 @@
 }
 
 .pos-quick-thumb {
+  position: relative;
   width: 100%;
   aspect-ratio: 1/1;
   border-radius: 12px;
   overflow: hidden;
-  background: #eef2f7;
+  background: var(--bm-surface-2);
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bm-muted);
+  font-size: 2rem;
 }
 
+/* The photo covers the icon; if the file is missing the icon shows through. */
 .pos-quick-thumb img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -612,10 +651,12 @@ body.pos-fullscreen .pos-right {
 .pos-tabs-modern {
   display: flex;
   overflow-x: auto;
-  gap: 10px;
-  padding: 10px;
-  background: var(--bm-surface);
+  gap: 8px;
+  padding: 2px 0 4px;
+  background: transparent;
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
 }
 
 .pos-tabs-modern::-webkit-scrollbar {
@@ -624,25 +665,32 @@ body.pos-fullscreen .pos-right {
 
 .pos-tab-modern {
   flex: 0 0 auto;
-  padding: 10px 20px;
-  border-radius: 12px;
+  scroll-snap-align: start;
+  padding: 8px 14px;
+  border-radius: 999px;
   background: var(--bm-surface-2);
-  border: none;
+  border: 1px solid var(--bm-border);
+  font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
   color: var(--bm-muted);
-  transition: all 0.2s;
+  transition: background .18s ease, color .18s ease, border-color .18s ease;
 }
+
+.pos-tab-modern:hover { color: var(--bm-text); }
 
 .pos-tab-modern.active {
   background: var(--bm-primary);
-  color: var(--bm-surface);
+  color: var(--bm-on-primary);
+  border-color: var(--bm-primary);
 }
 
 /* Header Adjustments */
 .pos-header-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  flex: 0 0 auto;
 }
 
 .fullscreen-btn {
@@ -708,3 +756,13 @@ body.pos-fullscreen .pos-right {
 }
 .pos-cart-head, .pos-summary, .pos-cart-list, .fullscreen-btn, .pos-header-actions select { background-color: var(--bm-surface); color: var(--bm-text); border-color: var(--bm-border); }
 .pos-empty { color: var(--bm-muted); }
+
+/* Suggestion row thumbnail */
+.pos-suggest-thumb {
+  position: relative;
+  width: 44px; height: 44px; flex: 0 0 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bm-surface-2); color: var(--bm-muted);
+  border: 1px solid var(--bm-border); border-radius: 10px; overflow: hidden;
+}
+.pos-suggest-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
