@@ -70,32 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception('Invalid product');
             }
             
-            // Update or insert stock by location
-            $stmt = $db->prepare("
-                INSERT INTO stock_by_location (product_id, location_id, qty_base, low_level_base)
-                VALUES (?, ?, ?, 0)
-                ON DUPLICATE KEY UPDATE qty_base = qty_base + VALUES(qty_base)
-            ");
-            $stmt->bind_param("iid", $product_id, $location_id, $qty_change);
-            if (!$stmt->execute()) {
-                throw new Exception('Failed to update stock');
-            }
-            $stmt->close();
-            
-            // Record stock movement
-            $stmt = $db->prepare("
-                INSERT INTO stock_movements (product_id, from_location_id, to_location_id, movement_type, qty_change, qty_before, qty_after, reference_type, reference_id, note, created_by)
-                VALUES (?, NULL, ?, 'stock_in', ?, 
-                    (SELECT COALESCE(qty_base, 0) FROM stock_by_location WHERE product_id=? AND location_id=?), 
-                    (SELECT COALESCE(qty_base, 0) FROM stock_by_location WHERE product_id=? AND location_id=?) + ?, 
-                    'stock_in', '', ?, ?)
-            ");
+            require_once __DIR__ . '/../../includes/stock.php';
             $userId = (int)($_SESSION['user']['id'] ?? 0);
-            $stmt->bind_param("iidddiisssi", $product_id, $location_id, $qty_change, $product_id, $location_id, $product_id, $location_id, $qty_change, $note, $userId);
-            if (!$stmt->execute()) {
-                throw new Exception('Failed to record stock movement');
-            }
-            $stmt->close();
+            stock_move($db, (int)$product_id, (int)$location_id, (float)$qty_change, 'stock_in', 'stock_in', null, (string)$note, $userId);
             
             // Log action
             if (function_exists('audit_log')) {

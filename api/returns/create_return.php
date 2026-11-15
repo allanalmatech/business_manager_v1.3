@@ -36,49 +36,7 @@ function column_exists(mysqli $db, string $table, string $col): bool {
   return $ok;
 }
 
-// Stock management function for returns
-function updateStockForReturn(mysqli $db, int $productId, float $quantity, int $locationId, int $saleId): void {
-  try {
-    $hasStockTable = table_exists($db, 'stock_by_location');
-    if ($hasStockTable) {
-      $checkStock = $db->prepare("SELECT qty_base FROM stock_by_location WHERE product_id = ? AND location_id = ?");
-      $checkStock->bind_param('ii', $productId, $locationId);
-      $checkStock->execute();
-      $stockData = $checkStock->get_result()->fetch_assoc();
-      $checkStock->close();
-
-      if ($stockData) {
-        $updateStock = $db->prepare("UPDATE stock_by_location SET qty_base = qty_base + ? WHERE product_id = ? AND location_id = ?");
-        $updateStock->bind_param('dii', $quantity, $productId, $locationId);
-        $updateStock->execute();
-        $updateStock->close();
-      } else {
-        $insertStock = $db->prepare("INSERT INTO stock_by_location (product_id, location_id, qty_base, low_level_base) VALUES (?, ?, ?, 0)");
-        $insertStock->bind_param('iid', $productId, $locationId, $quantity);
-        $insertStock->execute();
-        $insertStock->close();
-      }
-    }
-
-    $hasMovementsTable = table_exists($db, 'stock_movements');
-    if ($hasMovementsTable) {
-      $insertMovement = $db->prepare("
-        INSERT INTO stock_movements
-          (product_id, location_id, quantity, movement_type, reference_type, reference_id, notes, created_by, created_at)
-        VALUES
-          (?, ?, ?, 'return_in', 'sale_return', ?, 'Stock added from return', ?, NOW())
-      ");
-      if ($insertMovement) {
-        $createdBy = (int)($_SESSION['user']['id'] ?? 0);
-        $insertMovement->bind_param('iidii', $productId, $locationId, $quantity, $saleId, $createdBy);
-        $insertMovement->execute();
-        $insertMovement->close();
-      }
-    }
-  } catch (Throwable $e) {
-    error_log("Stock update error: " . $e->getMessage());
-  }
-}
+require_once dirname(dirname(__DIR__)) . '/includes/stock.php';
 
 // Auth
 if (empty($_SESSION['user']['id'])) {
@@ -110,7 +68,7 @@ $returnItems  = json_decode((string)($_POST['return_items'] ?? '[]'), true);
 // Basic validation
 if ($receiptNo === '' && $saleId <= 0) json_out(['success' => false, 'message' => 'Receipt number is required']);
 if ($reason === '') json_out(['success' => false, 'message' => 'Return reason is required']);
-if ($status === '') json_out(['success' => false, 'message' => 'Return status is required']);
+if (!in_array($status, ['pending','approved','completed'], true)) json_out(['success' => false, 'message' => 'Invalid return status']);
 if ($locationId <= 0) json_out(['success' => false, 'message' => 'Location is required']);
 if (empty($returnItems) || !is_array($returnItems)) json_out(['success' => false, 'message' => 'No items selected for return']);
 
@@ -182,7 +140,7 @@ try {
     throw new Exception('Failed to insert return: ' . $db->error);
   }
   $returnId = (int)$db->insert_id;
-  $st?->close();
+  if ($st) $st->close();
 
   // Insert items
   if ($hasItemsTable) {
@@ -198,22 +156,36 @@ try {
     }
     if (!$ins) throw new Exception('Prepare return_items failed: ' . $db->error);
 
+    $createdBy = (int)$_SESSION['user']['id'];
+    $returnValue = 0.0;
+    $lines = 0;
     foreach ($returnItems as $productId => $qty) {
       $productId = (int)$productId;
-      $qty = (float)$qty;
+      $qty = round((float)$qty, 3);
       if ($qty <= 0) continue;
 
-      // unit price from sale_items
-      $pc = $db->prepare("SELECT unit_price FROM sale_items WHERE sale_id = ? AND product_id = ? LIMIT 1");
+      // What was sold on this receipt, locked so two returns cannot both claim it
+      $pc = $db->prepare("SELECT COALESCE(SUM(qty_base),0) AS sold, MAX(unit_price) AS unit_price,
+                                 COALESCE(SUM(line_total),0) AS line_total, MAX(name_snapshot) AS name
+                          FROM sale_items WHERE sale_id = ? AND product_id = ? FOR UPDATE");
       $pc->bind_param('ii', $saleId, $productId);
       $pc->execute();
       $pd = $pc->get_result()->fetch_assoc();
       $pc->close();
 
-      if (!$pd) continue;
+      $sold = (float)($pd['sold'] ?? 0);
+      if ($sold <= 0) throw new StockError('That product is not on this receipt.');
+      $already = stock_returned_qty($db, $saleId, $productId, $returnId);
+      if ($qty > $sold - $already + 0.0005) {
+        $left = max(0, $sold - $already);
+        throw new StockError('Only ' . rtrim(rtrim(number_format($left, 3, '.', ''), '0'), '.') . ' of "' . $pd['name'] . '" can still be returned.');
+      }
 
-      $unitPrice = (float)$pd['unit_price'];
-      $total = $unitPrice * $qty;
+      // Refund value per unit is what the customer actually paid after discounts
+      $unitPrice = round((float)$pd['line_total'] / $sold, 2);
+      $total = round($unitPrice * $qty, 2);
+      $returnValue += $total;
+      $lines++;
 
       if ($hasItemLoc) {
         $ins->bind_param('iiiddd', $returnId, $productId, $locationId, $qty, $unitPrice, $total);
@@ -225,10 +197,15 @@ try {
         throw new Exception('Failed to insert return item: ' . $db->error);
       }
 
-      // Stock update only if completed
+      // Goods go back on the shelf only when the return is completed
       if ($status === 'completed') {
-        updateStockForReturn($db, $productId, $qty, $locationId, $saleId);
+        stock_move($db, $productId, $locationId, $qty, 'return', 'sale_return', (string)$returnId, "Return $returnNo", $createdBy);
       }
+    }
+
+    if ($lines === 0) throw new StockError('No items selected for return');
+    if ($refundAmount < 0 || $refundAmount > $returnValue + 0.005) {
+      throw new StockError('Refund cannot be more than the value of the returned items (' . number_format($returnValue, 2) . ').');
     }
 
     $ins->close();
@@ -243,7 +220,11 @@ try {
     'return_no' => $returnNo
   ]);
 
+} catch (StockError $e) {
+  $db->rollback();
+  json_out(['success' => false, 'message' => $e->getMessage()], 422);
 } catch (Throwable $e) {
   $db->rollback();
-  json_out(['success' => false, 'message' => $e->getMessage()], 500);
+  error_log('[returns.create] ' . $e->getMessage());
+  json_out(['success' => false, 'message' => 'The return could not be saved. Nothing was changed.'], 500);
 }

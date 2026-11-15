@@ -37,46 +37,7 @@ function column_exists(mysqli $db, string $table, string $col): bool {
 }
 
 // Stock update (same behavior as create_return.php)
-function updateStockForReturn(mysqli $db, int $productId, float $quantity, int $locationId, int $saleId): void {
-  try {
-    if (table_exists($db, 'stock_by_location')) {
-      $check = $db->prepare("SELECT qty_base FROM stock_by_location WHERE product_id = ? AND location_id = ?");
-      $check->bind_param('ii', $productId, $locationId);
-      $check->execute();
-      $row = $check->get_result()->fetch_assoc();
-      $check->close();
-
-      if ($row) {
-        $up = $db->prepare("UPDATE stock_by_location SET qty_base = qty_base + ? WHERE product_id = ? AND location_id = ?");
-        $up->bind_param('dii', $quantity, $productId, $locationId);
-        $up->execute();
-        $up->close();
-      } else {
-        $ins = $db->prepare("INSERT INTO stock_by_location (product_id, location_id, qty_base, low_level_base) VALUES (?, ?, ?, 0)");
-        $ins->bind_param('iid', $productId, $locationId, $quantity);
-        $ins->execute();
-        $ins->close();
-      }
-    }
-
-    if (table_exists($db, 'stock_movements')) {
-      $mv = $db->prepare("
-        INSERT INTO stock_movements
-          (product_id, location_id, quantity, movement_type, reference_type, reference_id, notes, created_by, created_at)
-        VALUES
-          (?, ?, ?, 'return_in', 'sale_return', ?, 'Stock added from return', ?, NOW())
-      ");
-      if ($mv) {
-        $createdBy = (int)($_SESSION['user']['id'] ?? 0);
-        $mv->bind_param('iidii', $productId, $locationId, $quantity, $saleId, $createdBy);
-        $mv->execute();
-        $mv->close();
-      }
-    }
-  } catch (Throwable $e) {
-    error_log("Stock update error: " . $e->getMessage());
-  }
-}
+require_once dirname(dirname(__DIR__)) . '/includes/stock.php';
 
 // -------------------- AUTH --------------------
 if (empty($_SESSION['user']['id'])) {
@@ -157,6 +118,16 @@ $hasRefundedCol = column_exists($db, 'sale_returns', 'refunded');
 try {
   $db->begin_transaction();
 
+  // Re-read under lock: only one request may complete (and restock) a return
+  $lk = $db->prepare("SELECT status FROM sale_returns WHERE id = ? FOR UPDATE");
+  $lk->bind_param('i', $returnId);
+  $lk->execute();
+  $locked = (string)($lk->get_result()->fetch_row()[0] ?? '');
+  $lk->close();
+  if (!in_array($locked === '' ? 'pending' : $locked, ['pending','approved'], true)) {
+    throw new StockError("This return was already {$locked}.");
+  }
+
   $sql = "UPDATE sale_returns SET reason = ?, status = ?, refund_amount = ?, selling_location_id = ?";
   $types = "ssdi";
   $params = [$reason, $status, $refundAmount, $locationId];
@@ -197,14 +168,9 @@ try {
 
       $saleId = (int)($current['sale_id'] ?? 0);
 
-      while ($row = $rs->fetch_assoc()) {
-        updateStockForReturn(
-          $db,
-          (int)$row['product_id'],
-          (float)$row['quantity'],
-          $locationId,
-          $saleId
-        );
+      $rows = $rs->fetch_all(MYSQLI_ASSOC);
+      foreach ($rows as $row) {
+        stock_move($db, (int)$row['product_id'], $locationId, (float)$row['quantity'], 'return', 'sale_return', (string)$returnId, "Return #$returnId completed", (int)$_SESSION['user']['id']);
       }
       $it->close();
     }
@@ -214,7 +180,11 @@ try {
 
   json_out(['success' => true, 'message' => 'Return updated successfully', 'return_id' => $returnId]);
 
+} catch (StockError $e) {
+  $db->rollback();
+  json_out(['success' => false, 'message' => $e->getMessage()], 422);
 } catch (Throwable $e) {
   $db->rollback();
-  json_out(['success' => false, 'message' => 'Caught exception: ' . $e->getMessage()], 500);
+  error_log('[returns.update] ' . $e->getMessage());
+  json_out(['success' => false, 'message' => 'The return could not be updated. Nothing was changed.'], 500);
 }

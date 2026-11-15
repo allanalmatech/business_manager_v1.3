@@ -905,27 +905,9 @@ try {
 
     $db->begin_transaction();
     try {
-      // Update or insert stock by location
-      $stmt = $db->prepare("
-        INSERT INTO stock_by_location (product_id, location_id, qty_base, low_level_base)
-        VALUES (?, ?, ?, 0)
-        ON DUPLICATE KEY UPDATE qty_base = qty_base + VALUES(qty_base)
-      ");
-      if (!$stmt) throw new Exception('Prepare failed');
-      $stmt->bind_param("iid", $product_id, $location_id, $qty_change);
-      if (!$stmt->execute()) throw new Exception('Stock update failed');
-      $stmt->close();
-
-      // Record stock movement
-      $stmt = $db->prepare("
-        INSERT INTO stock_movements (product_id, location_id, movement_type, quantity, unit_type, unit_price, notes, created_by)
-        VALUES (?, ?, 'stock_in', ?, ?, ?, ?, ?)
-      ");
-      if (!$stmt) throw new Exception('Prepare failed');
+      require_once __DIR__ . '/../includes/stock.php';
       $userId = (int)($_SESSION['user']['id'] ?? 0);
-      $stmt->bind_param("iidsssi", $product_id, $location_id, $qty_change, $unit_type, $unit_price, $note, $userId);
-      if (!$stmt->execute()) throw new Exception('Stock movement record failed');
-      $stmt->close();
+      stock_move($db, (int)$product_id, (int)$location_id, (float)$qty_change, 'stock_in', 'stock_in', null, (string)$note, $userId);
 
       // Log action
       if (function_exists('audit_log')) {
