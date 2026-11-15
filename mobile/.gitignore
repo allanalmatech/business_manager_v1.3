@@ -1,0 +1,10 @@
+.gradle/
+local.properties
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+key.properties
+*.jks
+

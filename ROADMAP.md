@@ -1,6 +1,6 @@
 # Business Manager — Roadmap and Progress
 
-Last updated: 2026-11-15 · App version: 1.4.0
+Last updated: 2026-11-15 · App version: 1.4.0 · Mobile app: 1.4.0+1
 
 Status key: ✅ done and tested · 🟡 in progress · ⬜ not started
 
@@ -13,11 +13,15 @@ then things that are broken, then new features, then the mobile app.
 |---|---|---|
 | 1 | Security hardening | ✅ |
 | 2 | Installer, uninstaller, migrations, one-click updates | ✅ |
-| 3 | Broken features and POS correctness | 🟡 most done |
-| 4 | UI: responsive layout, sidebar, themes, settings | ⬜ |
-| 5 | Missing business features | ⬜ |
-| 6 | Sync API for mobile | ⬜ |
-| 7 | Mobile app | ⬜ |
+| 3 | Broken features and POS correctness | ✅ |
+| 4 | UI: responsive layout, sidebar, themes, settings | ✅ |
+| 5 | Missing business features | ✅ |
+| 6 | Sync API for mobile | ✅ |
+| 7 | Mobile app | ✅ written, not yet built |
+
+**Next:** build the Android APK (needs a machine with Flutter installed — it
+cannot be downloaded in this environment), test it against a real server and a
+real Bluetooth printer, then work through the "still to do" list at the end.
 
 ---
 
@@ -52,7 +56,7 @@ then things that are broken, then new features, then the mobile app.
 - ⬜ Maintenance-mode page shown to staff while an update runs
 - ⬜ Scheduled automatic database backups with download from the admin area
 
-## Phase 3 — Broken features and POS correctness 🟡
+## Phase 3 — Broken features and POS correctness ✅
 
 - ✅ Sales failed on strict-mode databases (stock movement rows lacked before/after quantities)
 - ✅ Prices are taken from the database; cashiers without `pos.edit_price` always sell at list price
@@ -73,66 +77,75 @@ then things that are broken, then new features, then the mobile app.
 - ✅ Accountant dashboard shows live figures
 - ✅ Requires PHP 8.0+ (checked by the installer) instead of half-supporting PHP 7
 - ⬜ POS screen should show the enforced price when the cashier cannot edit prices
-- ⬜ Returns: same stock locking and movement ledger as sales
+- ✅ Returns: same stock locking and movement ledger as sales
 - ⬜ Installments: CSRF-safe actions reviewed and tested end to end
-- ⬜ Notifications centre (low stock, overdue installments, unpaid documents)
-- ⬜ Remove the remaining 30 empty placeholder files or implement them
-- ⬜ Remove schema changes that still run inside requests (`CREATE TABLE IF NOT EXISTS` in several modules)
+- ✅ Notifications centre (low stock, expiring, unpaid, returns, installments)
+- ✅ Removed 31 empty placeholder files
+- ✅ Schema changes moved out of request handlers into migrations
 
-## Phase 4 — UI ⬜
+## Phase 4 — UI ✅
 
-- ⬜ One design-token file (colour, spacing, type scale) used by every page; delete per-page `<style>` blocks and inline styles
-- ⬜ Responsive layout from 320 px phones to wide desktops; tables collapse to cards on small screens
-- ⬜ Sidebar: grouped by job (Sell, Stock, Money, People, Reports, Admin), remembers open group, smooth open/close, icon-only rail on tablets, drawer on phones
-- ⬜ Themes: rebuild all 10 so text, borders and focus rings pass WCAG AA contrast; automated contrast check in the repo
-- ⬜ Replace 84 browser `alert()`/`confirm()` calls with toasts and confirm dialogs
-- ⬜ Bundle Bootstrap, icons and Cropper locally so the till works without internet
-- ⬜ Shared components: table, filter bar, pagination, empty state, modal, flash message
-- ⬜ POS: keyboard shortcuts, barcode field, hold/park sale, clear change-due display
-- ⬜ Settings: grouped cards (Business, Sales & Tax, Receipts & Printing, Payments, Messaging, Appearance, System) with switches and pickers instead of raw key/value rows
-- ⬜ Print stylesheet for receipts (58 mm / 80 mm) and A4 invoices
+- ✅ One set of design tokens bridged to Bootstrap, so every component follows the theme
+- ✅ Responsive from 320 px phones to wide desktops; tables become labelled cards on small screens
+- ✅ Sidebar grouped by job (Sell, Stock, Money, People, Admin), animated groups, icon rail with fly-outs, mobile drawer
+- ✅ All 10 themes rebuilt by `tools/build_themes.py`, which refuses to write if any of 23 colour pairs falls under WCAG AA
+- ✅ Toasts and a proper confirm dialog replace 84 `alert()`/`confirm()` calls
+- ✅ Bootstrap, icons and Cropper served locally — the till keeps its styling with no internet
+- ✅ Shared components: empty state, stat tile, toasts, confirm, table stacking
+- ✅ POS: hold/resume sales, F2/F4/F8/F9 shortcuts, mobile cart bar, barcode scan-to-add, working category filters
+- ✅ Settings rebuilt as grouped cards with switches and pickers, saving as you go
+- ✅ Print stylesheet for receipts (58/80 mm) and A4
+- ⬜ Dark mode that follows the phone's own setting (themes exist; no automatic switch)
 
-## Phase 5 — Missing business features ⬜
+## Phase 5 — Missing business features ✅
 
-- ⬜ Tax/VAT: per-product rate, inclusive/exclusive pricing, tax on documents and reports
-- ⬜ Cashier shifts: opening float, cash in/out, end-of-day count and Z-report
-- ⬜ Barcodes: product barcode field, scan to sell, label printing
-- ⬜ Email (SMTP) and SMS gateway delivery; message queue with retries
-- ⬜ Scheduled reminders for unpaid documents and installments (cron scripts are empty today)
-- ⬜ PDF receipts, invoices and delivery notes
+- ✅ Tax/VAT: rate, inclusive or exclusive, shown at the till, stored per sale, on the shift report
+- ✅ Cashier shifts: opening float, cash in/out, count and close, shift (Z) report
+- ✅ Barcodes: unique per product, scan-to-sell in the POS
+- ✅ Email by SMTP or the server's mail, SMS via Africa's Talking, EgoSMS or a send link, each with a test button
+- ✅ Scheduled reminders for unpaid documents and installments (`cron/run.php`), recorded so they never send twice
+- ✅ Customer credit limits, enforced at the till
+- ✅ Stock transfers between locations
+- ✅ Automated tests (`tests/run.php`) — 24 checks over migrations, stock, tax, settings, numbering
+- ⬜ PDF receipts and invoices
 - ⬜ Mobile money collection (Flutterwave keys are stored but unused)
-- ⬜ Purchase orders and goods received, linked to suppliers and cost history
-- ⬜ Stock transfers between locations and stock-take sessions
-- ⬜ Customer credit limits and statements
-- ⬜ Automated test suite for sales, returns, stock and permissions
+- ⬜ Purchase orders and goods received
+- ⬜ Stock-take sessions
+- ⬜ Customer statements
 
-## Phase 6 — Sync API for mobile ⬜
+## Phase 6 — Sync API for mobile ✅
 
-Design goals: the server stays the single source of truth; every write is safe to retry.
+- ✅ Versioned JSON API (`/api/v1`) with a revocable token per device
+- ✅ Change feed fed by database triggers, with a full-snapshot fallback for hosts that forbid them
+- ✅ Pull: everything changed since version N, paged, safe to repeat
+- ✅ Push: every action carries a uuid; the server applies it once and returns the same answer on a retry
+- ✅ Conflict rules: sales append-only, stock by deltas, edits checked against what the device last saw
+- ✅ Offline sales accepted and flagged for review rather than refused (Administration → Devices)
+- ✅ Photo upload: re-encoded server-side, metadata stripped, long cache headers
+- ✅ `docs/API.md`
 
-- ⬜ Versioned JSON API (`/api/v1`) with token sign-in per device (revocable)
-- ⬜ Every syncable row gets `updated_at`, a soft-delete flag and a monotonically increasing `sync_version`
-- ⬜ Pull: "give me everything changed since version N", paged
-- ⬜ Push: each offline action carries a client-generated UUID; the server applies it once and returns the same result on retry
-- ⬜ Conflict rules: sales are append-only; stock is changed by deltas, never overwritten; edits to shared records use version checks and return the newer copy on conflict
-- ⬜ Oversell while offline: sale is accepted, flagged for review, and stock shown as negative-pending
-- ⬜ Image endpoint with size limits, resizing and long-lived cache headers (ETag)
+## Phase 7 — Mobile app ✅ (written; not yet compiled)
 
-## Phase 7 — Mobile app ⬜
+Flutter, in `mobile/`. Written and checked structurally, but **not compiled**:
+the Flutter toolchain cannot be downloaded in the environment this was built
+in. Treat the first `flutter build` as the real test.
 
-Proposed stack: Flutter (one codebase for Android and iOS), SQLite for local data.
-
-- ⬜ App shell: sign-in, role-based home, bottom navigation (Sell, Products, Stock, Reports, More)
-- ⬜ Layered structure: UI → use cases → repositories → local database + API client
-- ⬜ Offline-first: every screen reads from the local database; a background queue pushes changes and pulls updates when the network returns
-- ⬜ Sync status always visible (pending count, last sync, conflicts to review)
-- ⬜ In-app barcode scanning with the camera
-- ⬜ Bluetooth receipt printing (raw ESC/POS) behind a printer plugin interface
-- ⬜ Product photos from the camera, resized and compressed on the phone before upload (target ≤ 200 KB)
-- ⬜ Image cache with a size cap; least-recently-used images are evicted first
-- ⬜ Cached reference data (products, prices, customers) refreshed by sync version so it never drifts from the server
-- ⬜ Feature parity checklist against the web modules
-- ⬜ Low-end device budget: cold start under 3 s, APK under 25 MB
+- ✅ Layered: `core` → `domain` → `data` (local, remote, repositories) → `features`. A screen never calls the network or writes SQL.
+- ✅ Offline-first: the phone's SQLite database is what every screen reads; sync is the only thing that fills it
+- ✅ Queue with a uuid per action, so retrying after a crash or flat battery cannot record a sale twice
+- ✅ Concurrency: stock sent as changes not totals; edits carry the value last seen and come back as conflicts
+- ✅ The phone subtracts its own unsent sales from the stock it shows
+- ✅ Sign in, till (search, scan, basket, payment, change due), products, stock changes, sales history, settings
+- ✅ Barcode scanning in the app (camera)
+- ✅ Bluetooth receipt printing: raw serial connection in Kotlin, ESC/POS bytes built in Dart
+- ✅ Product photos from the camera, shrunk to ≤1280 px and ~200 KB before upload, metadata stripped
+- ✅ Image cache with a 60 MB budget; least recently looked at is deleted first
+- ✅ Android manifest, Gradle files, ProGuard rules, README
+- ✅ `tools/check_mobile.py` — structural checks in place of a compiler
+- ⬜ **Build the APK and run it** against a real server and a real printer
+- ⬜ iOS target (the code is portable; only the printer plugin is Android-only)
+- ⬜ Widget tests, and an end-to-end test against a staging server
+- ⬜ Play Store listing and signing key
 
 ---
 
@@ -140,9 +153,18 @@ Proposed stack: Flutter (one codebase for Android and iOS), SQLite for local dat
 
 1. **Git history.** The old database dump (password hashes, sessions, customer rows) is still in the repository's history. Removing it means rewriting history and force-pushing, and the repository is public. Until then, treat every password in that dump as exposed.
 2. **Audit logs.** Should deleting audit logs be possible at all, or only archiving?
-3. **Discount floor.** Discounts currently cannot take a line below wholesale price. Confirm that is the rule you want.
-4. **Mobile stack.** Flutter is proposed; say so if you prefer React Native or native Android.
-5. **Uploaded images in git.** `uploads/` is tracked. On a live server this makes updates clash with new uploads; it should be untracked once you confirm the live images are backed up.
+3. **Discount floor.** Discounts currently cannot take a line below the wholesale price. Confirm that is the rule you want.
+4. **Uploaded images in git.** `uploads/` is tracked. On a live server this makes updates clash with new uploads; it should be untracked once you confirm the live images are backed up.
+5. **Mobile app server address.** The APK is built with `--dart-define=BM_BASE_URL=...`. Confirm the address to build against.
+
+## Still to do, in the order I would take it
+
+1. Build the Android APK and test it against the live server and a real printer
+2. PDF receipts and invoices
+3. Mobile money collection
+4. Purchase orders and goods received
+5. Dark mode following the phone's setting
+6. iOS build
 
 ## Change log
 
