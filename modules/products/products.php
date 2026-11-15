@@ -423,7 +423,7 @@ function displayProductImages() {
     productImages.forEach((img, index) => {
       const div = document.createElement('div');
       div.className = 'position-relative d-inline-block me-2 mb-2';
-      const imageSrc = img.startsWith('http') ? img : (BASE_URL + '/' + img);
+      const imageSrc = BM.imageUrl(img);
       div.innerHTML = `
         <img src="${imageSrc}" alt="Product image ${index + 1}" style="width: 80px; height: 80px; object-fit: cover;" class="rounded border">
         <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" onclick="removeImage(${index})" style="padding: 2px 6px;">
@@ -552,26 +552,15 @@ async function startBulkImport() {
 
 async function scrapeAndStoreImage(imageUrl) {
   // Validate URL format
-  if (!imageUrl.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i)) {
+  if (!imageUrl.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i)) {
     throw new Error('Invalid image URL format');
-  }
-  
-  // Test if image is accessible
-  const testResponse = await fetch(imageUrl, { method: 'HEAD' });
-  if (!testResponse.ok) {
-    throw new Error('Image not accessible');
-  }
-  
-  const contentType = testResponse.headers.get('content-type');
-  if (!contentType || !contentType.startsWith('image/')) {
-    throw new Error('URL does not point to an image');
   }
   
   // Download image via server
   const formData = new FormData();
   formData.append('url', imageUrl);
   formData.append('product_id', currentProductId || 0);
-  formData.append('csrf', window.APP.CSRF);
+  formData.append('csrf', (window.APP && window.APP.CSRF) || BM.csrf);
   
   const response = await fetch(BASE_URL + '/api/products.php?action=scrape_image', {
     method: 'POST',
@@ -639,24 +628,25 @@ function handleFileUpload(files) {
 }
 
 // URL import handler
-function importFromUrl() {
+async function importFromUrl() {
   const url = prompt('Enter image URL:');
   if (!url) return;
-  
-  if (!url.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i)) {
-    alert('Please enter a valid image URL');
+
+  if (!url.trim().match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i)) {
+    BM.toast('That does not look like a link to a picture. It should end in .jpg, .png, .gif or .webp', 'warning');
     return;
   }
-  
-  // Create a temporary image to test if URL loads
-  const img = new Image();
-  img.onload = function() {
-    addImageToGallery(url);
-  };
-  img.onerror = function() {
-    alert('Failed to load image from URL');
-  };
-  img.src = url;
+
+  // The server downloads it and keeps a copy here, so the picture still shows
+  // if the other site changes, blocks us, or goes offline.
+  BM.toast('Downloading the picture…', 'info', 2000);
+  try {
+    const result = await scrapeAndStoreImage(url.trim());
+    addImageToGallery(result.url);
+    BM.toast('Picture saved to this shop.', 'success');
+  } catch (e) {
+    BM.toast('Could not fetch that picture. ' + (e.message || ''), 'danger', 8000);
+  }
 }
 
 function openQRCapture() {
@@ -1159,7 +1149,7 @@ async function loadProducts(){
     const firstImage = images.length > 0 ? images[0] : null;
 
     const imageCell = firstImage
-      ? `<img src="${firstImage.startsWith('http') ? firstImage : (BASE_URL + '/' + firstImage)}" width="40" height="40" class="border rounded" style="object-fit:cover;">`
+      ? `<img src="${BM.imageUrl(firstImage)}" width="40" height="40" class="border rounded" style="object-fit:cover;">`
       : `<div class="text-muted small">—</div>`;
 
     tr.innerHTML = `

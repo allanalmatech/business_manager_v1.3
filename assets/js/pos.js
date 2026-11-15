@@ -195,30 +195,9 @@
   }
   window.renderTotals = renderTotals;
 
-  // Turns whatever the server sent (a path, a JSON array, an empty array) into a
-  // usable URL, or "" when the product has no photo so the icon is shown instead.
+  // One shared helper (assets/js/core.js) so every screen builds image URLs the same way.
   function toImg(thumbnail) {
-    if (thumbnail === null || thumbnail === undefined) return "";
-    let value = thumbnail;
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed === "" || trimmed === "[]" || trimmed === "null") return "";
-      if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-        try { value = JSON.parse(trimmed); } catch (_) { value = trimmed; }
-      } else {
-        value = trimmed;
-      }
-    }
-    if (Array.isArray(value)) value = value.length ? value[0] : "";
-    if (value && typeof value === "object") {
-      value = value.path || value.url || value.src || value.file || "";
-    }
-    let url = String(value || "").trim();
-    if (url === "") return "";
-    if (/^(https?:)?\/\//i.test(url) || url.startsWith("data:")) return url;  // already absolute
-    url = url.replace(/\/{2,}/g, "/").replace(/^\/+/, "");
-    const base = (CFG.baseUrl || "").replace(/\/+$/, "");
-    return `${base}/${url}`;
+    return window.BM && BM.imageUrl ? BM.imageUrl(thumbnail) : '';
   }
 
   // ---------- Cart rendering ----------

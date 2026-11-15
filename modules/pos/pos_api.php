@@ -152,6 +152,31 @@ if ($action === 'quick_items') {
   csrf_check($in['csrf'] ?? '');
 
   $location_id = (int)($in['selling_location_id'] ?? 0);
+  $category = trim((string)($in['category'] ?? ''));
+
+  // The chips under the search box narrow what the grid shows:
+  // "" = everything, "popular" = what actually sells, a number = that category.
+  $join = '';
+  $where = 'p.is_active = 1';
+  $order = 'p.name ASC';
+  $types = 'i';
+  $args = [$location_id];
+
+  if ($category === 'popular') {
+    $join = "LEFT JOIN (
+               SELECT si.product_id, SUM(si.qty_base) AS qty
+               FROM sale_items si
+               JOIN sales sa ON sa.id = si.sale_id
+               WHERE sa.status <> 'voided'
+                 AND sa.created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+               GROUP BY si.product_id
+             ) sold ON sold.product_id = p.id";
+    $order = 'COALESCE(sold.qty, 0) DESC, p.name ASC';
+  } elseif ($category !== '' && ctype_digit($category)) {
+    $where .= ' AND p.category_id = ?';
+    $types .= 'i';
+    $args[] = (int)$category;
+  }
 
   $sql = "
     SELECT 
@@ -162,15 +187,16 @@ if ($action === 'quick_items') {
     FROM products p
     LEFT JOIN stock_by_location s 
       ON s.product_id = p.id AND s.location_id = ?
-    WHERE p.is_active = 1
-    ORDER BY p.name ASC
-    LIMIT 24
+    $join
+    WHERE $where
+    ORDER BY $order
+    LIMIT 48
   ";
 
   $st = $db->prepare($sql);
-  if (!$st) out(['ok'=>false,'error'=>$db->error], 500);
+  if (!$st) pos_fail($db, 'quick items');
 
-  $st->bind_param('i', $location_id);
+  $st->bind_param($types, ...$args);
   $st->execute();
   $rs = $st->get_result();
 
@@ -183,7 +209,7 @@ if ($action === 'quick_items') {
       'thumbnail' => pos_thumb($r['thumbnail']),
       'retail_price' => (float)$r['retail_price'],
       'wholesale_price' => (float)$r['wholesale_price'],
-      'stock_display' => 'Stock: ' . (string)$r['stock_qty'],
+      'stock_display' => 'Stock: ' . rtrim(rtrim(number_format((float)$r['stock_qty'], 3, '.', ''), '0'), '.'),
     ];
   }
   $st->close();

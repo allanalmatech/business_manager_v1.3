@@ -24,6 +24,33 @@
     catch (e) { return false; }
   }
 
+  /**
+   * One way to turn a stored product image into a URL that loads.
+   * Copes with a JSON array, an object, an empty array, a path, and an
+   * address on another site, which older "import from URL" saved as-is.
+   * Returns "" when there is no usable picture, so callers show a placeholder.
+   */
+  window.BM.imageUrl = function (value) {
+    if (value === null || value === undefined) return '';
+    var v = value;
+    if (typeof v === 'string') {
+      var t = v.trim();
+      if (t === '' || t === '[]' || t === 'null') return '';
+      if (t.charAt(0) === '[' || t.charAt(0) === '{') {
+        try { v = JSON.parse(t); } catch (e) { v = t; }
+      } else { v = t; }
+    }
+    if (Array.isArray(v)) v = v.length ? v[0] : '';
+    if (v && typeof v === 'object') v = v.path || v.url || v.src || v.file || '';
+    var url = String(v || '').trim();
+    if (url === '') return '';
+    // Repair addresses saved as "https:/host/..." by older code
+    url = url.replace(/^(https?):\/(?!\/)/i, '$1://');
+    if (/^(https?:)?\/\//i.test(url) || url.indexOf('data:') === 0) return url;
+    url = url.replace(/\/{2,}/g, '/').replace(/^\/+/, '');
+    return (BASE || '').replace(/\/+$/, '') + '/' + url;
+  };
+
   // fetch
   if (window.fetch) {
     var _fetch = window.fetch.bind(window);

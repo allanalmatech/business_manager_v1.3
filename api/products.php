@@ -751,7 +751,7 @@ try {
     }
     
     // Validate URL format
-    if (!filter_var($url, FILTER_VALIDATE_URL) || !preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $url)) {
+    if (!filter_var($url, FILTER_VALIDATE_URL) || !preg_match('/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i', $url)) {
       out_err('Invalid image URL format');
     }
     

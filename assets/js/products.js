@@ -151,8 +151,8 @@
       
       tr.innerHTML = `
         <td class="ps-4">
-          <div class="bg-light rounded" style="width:48px;height:48px;overflow:hidden;">
-            ${p.image ? `<img src="${window.APP.BASE_URL}/${p.image}" style="width:100%;height:100%;object-fit:cover;">` : '<i class="bi bi-box p-2 opacity-25" style="font-size:1.5rem"></i>'}
+          <div class="bg-light rounded d-flex align-items-center justify-content-center position-relative" style="width:48px;height:48px;overflow:hidden;">
+            ${BM.imageUrl(p.image) ? `<img src="${BM.imageUrl(p.image)}" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" onerror="this.remove();">` : ''}<i class="bi bi-box p-2 opacity-25" style="font-size:1.5rem"></i>
           </div>
         </td>
         <td>
