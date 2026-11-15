@@ -30,6 +30,28 @@ require_once __DIR__ . '/../includes/audit.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 
+/** Stores the barcode sent with a product; blank clears it. Barcodes are unique. */
+function product_set_barcode(mysqli $db, int $id, array $raw): void {
+  if (!array_key_exists('barcode', $raw)) return;
+  $bc = trim((string)$raw['barcode']);
+  if ($bc === '') {
+    $st = $db->prepare("UPDATE products SET barcode = NULL WHERE id = ?");
+    $st->bind_param('i', $id);
+  } else {
+    if (!preg_match('/^[A-Za-z0-9._\-]{3,64}$/', $bc)) throw new Exception('Barcode can only contain letters, numbers, dots and dashes');
+    $chk = $db->prepare("SELECT name FROM products WHERE barcode = ? AND id <> ? LIMIT 1");
+    $chk->bind_param('si', $bc, $id);
+    $chk->execute();
+    $other = $chk->get_result()->fetch_assoc();
+    $chk->close();
+    if ($other) throw new Exception('That barcode already belongs to "' . $other['name'] . '"');
+    $st = $db->prepare("UPDATE products SET barcode = ? WHERE id = ?");
+    $st->bind_param('si', $bc, $id);
+  }
+  $st->execute();
+  $st->close();
+}
+
 function out_ok($data = [], int $code = 200): void {
   http_response_code($code);
   if (ob_get_length()) ob_clean();
@@ -661,6 +683,7 @@ try {
           }
         }
 
+        product_set_barcode($db, $newId, $raw);
         audit_log('products.create', 'product', (string)$newId, "Created: $sku");
         $db->commit();
         out_ok(['id' => $newId]);
@@ -703,6 +726,7 @@ try {
         }
       }
 
+      product_set_barcode($db, (int)$id, $raw);
       audit_log('products.update', 'product', (string)$id, "Updated: $sku");
       $db->commit();
       out_ok(['id' => $id]);

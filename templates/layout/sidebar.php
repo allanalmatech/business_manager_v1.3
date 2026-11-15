@@ -55,6 +55,7 @@ $menu = [
             ['Stock levels', '/modules/products/stock_levels.php', 'products.view'],
             ['Receive stock', '/modules/products/stock_in.php', 'products.view'],
             ['Adjustments', '/modules/products/stock_adjustments.php', 'products.view'],
+            ['Transfers', '/modules/products/stock_transfer.php', 'products.view'],
             ['Movements', '/modules/products/stock_movements.php', 'products.view'],
             ['Stores', '/modules/stores/stores.php', 'stores.view'],
         ]],

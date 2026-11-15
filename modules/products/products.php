@@ -85,8 +85,12 @@ require_once __DIR__ . '/../../templates/layout/header.php';
             <input class="form-control" id="name">
           </div>
           <div class="col-md-4">
-            <label class="form-label">SKU / Barcode *</label>
-            <input class="form-control" id="sku">
+            <label class="form-label" for="sku">SKU</label>
+            <input class="form-control" id="sku" placeholder="Made for you if left blank">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="barcode">Barcode</label>
+            <input class="form-control" id="barcode" inputmode="numeric" autocomplete="off" placeholder="Scan or type">
           </div>
 
           <div class="col-12">
@@ -1254,6 +1258,7 @@ async function openEdit(id){
   document.getElementById('id').value = p.id;
   document.getElementById('name').value = p.name || '';
   document.getElementById('sku').value = p.sku || '';
+  document.getElementById('barcode').value = p.barcode || '';
   document.getElementById('description').value = p.description || '';
   document.getElementById('source').value = p.source || '';
   document.getElementById('unit_type').value = p.unit_type || 'pieces';
@@ -1333,6 +1338,7 @@ async function save(){
     id,
     name,
     sku,
+    barcode: document.getElementById('barcode').value.trim(),
     description: document.getElementById('description').value.trim(),
     source: sourceVal,
     unit_type: document.getElementById('unit_type').value,

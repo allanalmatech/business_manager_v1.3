@@ -87,7 +87,7 @@ $total_pages = ceil($total / $per_page);
 
 // Fetch customers
 $query = "
-    SELECT c.id, c.name, c.email, c.phone, c.address, c.is_active, c.created_at,
+    SELECT c.id, c.name, c.email, c.phone, c.address, c.credit_limit, c.is_active, c.created_at,
            COUNT(s.id) as total_sales, COALESCE(SUM(s.grand_total), 0) as total_spent
     FROM customers c
     LEFT JOIN sales s ON c.id = s.customer_id
@@ -151,21 +151,22 @@ function handle_add_customer(): array {
     $phone = trim((string)($_POST['phone'] ?? ''));
     $address = trim((string)($_POST['address'] ?? ''));
     
-    if (!$name || !$email) {
-        return ['success' => false, 'message' => 'Name and email are required'];
+    $credit_limit = max(0, round((float)($_POST['credit_limit'] ?? 0), 2));
+    if (!$name) {
+        return ['success' => false, 'message' => 'Name is required'];
     }
     
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         return ['success' => false, 'message' => 'Invalid email address'];
     }
     
     try {
         $st = $db->prepare("INSERT INTO customers 
-            (name, email, phone, address, created_at) 
-            VALUES (?, ?, ?, ?, NOW())");
+            (name, email, phone, address, credit_limit, created_at) 
+            VALUES (?, ?, ?, ?, ?, NOW())");
         
         if (!$st) throw new Exception('Prepare failed');
-        $st->bind_param('ssss', $name, $email, $phone, $address);
+        $st->bind_param('ssssd', $name, $email, $phone, $address, $credit_limit);
         $st->execute();
         $customer_id = $st->insert_id;
         $st->close();
@@ -190,21 +191,22 @@ function handle_update_customer(): array {
     $address = trim((string)($_POST['address'] ?? ''));
     $is_active = isset($_POST['is_active']) ? 1 : 0;
     
-    if ($id <= 0 || !$name || !$email) {
-        return ['success' => false, 'message' => 'Invalid parameters'];
+    $credit_limit = max(0, round((float)($_POST['credit_limit'] ?? 0), 2));
+    if ($id <= 0 || !$name) {
+        return ['success' => false, 'message' => 'Name is required'];
     }
     
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         return ['success' => false, 'message' => 'Invalid email address'];
     }
     
     try {
         $st = $db->prepare("UPDATE customers 
-            SET name = ?, email = ?, phone = ?, address = ?, is_active = ?, updated_at = NOW()
+            SET name = ?, email = ?, phone = ?, address = ?, credit_limit = ?, is_active = ?, updated_at = NOW()
             WHERE id = ? LIMIT 1");
         
         if (!$st) throw new Exception('Prepare failed');
-        $st->bind_param('sssssi', $name, $email, $phone, $address, $is_active, $id);
+        $st->bind_param('ssssdii', $name, $email, $phone, $address, $credit_limit, $is_active, $id);
         $st->execute();
         $st->close();
         
@@ -265,7 +267,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     fputcsv($output, ['ID', 'Name', 'Email', 'Phone', 'Address', 'Active', 'Total Sales', 'Total Spent', 'Date Added']);
     
     $query = "
-        SELECT c.id, c.name, c.email, c.phone, c.address, c.is_active, c.created_at,
+        SELECT c.id, c.name, c.email, c.phone, c.address, c.credit_limit, c.is_active, c.created_at,
                COUNT(s.id) as total_sales, COALESCE(SUM(s.grand_total), 0) as total_spent
         FROM customers c
         LEFT JOIN sales s ON c.id = s.customer_id
@@ -497,8 +499,8 @@ include __DIR__ . '/../../templates/layout/header.php';
                                 </td>
                                 <td class="text-center">
                                     <div class="btn-group btn-group-sm" role="group">
-                                        <button class="btn btn-outline-primary" data-bs-toggle="modal" 
-                                                data-bs-target="#editCustomerModal<?= $cust['id']; ?>" title="Edit">
+                                        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCustomerModal" title="Edit" aria-label="Edit <?= htmlspecialchars((string)$cust['name']) ?>"
+                                                data-customer="<?= htmlspecialchars(json_encode(['id' => (int)$cust['id'], 'name' => (string)$cust['name'], 'email' => (string)($cust['email'] ?? ''), 'phone' => (string)($cust['phone'] ?? ''), 'address' => (string)($cust['address'] ?? ''), 'credit_limit' => (float)($cust['credit_limit'] ?? 0), 'is_active' => (int)($cust['is_active'] ?? 1)]), ENT_QUOTES) ?>">
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <?php if (user_has_permission('contacts.delete')): ?>
@@ -567,19 +569,26 @@ include __DIR__ . '/../../templates/layout/header.php';
                             <input type="text" class="form-control" id="newName" name="name" placeholder="Customer name" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label" for="newEmail">Email *</label>
-                            <input type="email" class="form-control" id="newEmail" name="email" placeholder="email@example.com" required>
+                            <label class="form-label" for="newEmail">Email</label>
+                            <input type="email" class="form-control" id="newEmail" name="email" placeholder="Optional">
                         </div>
                     </div>
                     
                     <div class="row mt-3">
                         <div class="col-md-6">
                             <label class="form-label" for="newPhone">Phone</label>
-                            <input type="tel" class="form-control" id="newPhone" name="phone" placeholder="+1 (555) 123-4567">
+                            <input type="tel" class="form-control" id="newPhone" name="phone" placeholder="e.g. 0700 123456">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="newAddress">Address</label>
                             <input type="text" class="form-control" id="newAddress" name="address" placeholder="Full address">
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="newCredit">Credit limit</label>
+                            <input type="number" min="0" step="0.01" class="form-control" id="newCredit" name="credit_limit" value="0">
+                            <div class="form-text">0 means no limit.</div>
                         </div>
                     </div>
                 </div>
@@ -592,4 +601,35 @@ include __DIR__ . '/../../templates/layout/header.php';
     </div>
 </div>
 
+
+<!-- Edit customer (one dialog, filled from the row that was clicked) -->
+<div class="modal fade" id="editCustomerModal" tabindex="-1" aria-labelledby="editCustomerTitle" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post">
+      <input type="hidden" name="action" value="update_customer">
+      <input type="hidden" name="customer_id" id="ecId">
+      <div class="modal-header"><h5 class="modal-title" id="editCustomerTitle">Edit customer</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="ecName">Name</label><input class="form-control" id="ecName" name="name" required></div>
+          <div class="col-md-6"><label class="form-label" for="ecPhone">Phone</label><input class="form-control" id="ecPhone" name="phone" type="tel"></div>
+          <div class="col-md-6"><label class="form-label" for="ecEmail">Email</label><input class="form-control" id="ecEmail" name="email" type="email"></div>
+          <div class="col-md-6"><label class="form-label" for="ecCredit">Credit limit</label><input class="form-control" id="ecCredit" name="credit_limit" type="number" min="0" step="0.01"><div class="form-text">0 means no limit.</div></div>
+          <div class="col-12"><label class="form-label" for="ecAddress">Address</label><input class="form-control" id="ecAddress" name="address"></div>
+          <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="ecActive" name="is_active" value="1"><label class="form-check-label" for="ecActive">Active</label></div></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
+    </form>
+  </div>
+</div>
+<script>
+document.getElementById('editCustomerModal').addEventListener('show.bs.modal', function (e) {
+  var c = JSON.parse(e.relatedTarget.getAttribute('data-customer'));
+  document.getElementById('ecId').value = c.id; document.getElementById('ecName').value = c.name;
+  document.getElementById('ecPhone').value = c.phone; document.getElementById('ecEmail').value = c.email;
+  document.getElementById('ecAddress').value = c.address; document.getElementById('ecCredit').value = c.credit_limit;
+  document.getElementById('ecActive').checked = !!c.is_active;
+});
+</script>
 <?php include __DIR__ . '/../../templates/layout/footer.php'; ?>

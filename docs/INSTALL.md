@@ -37,3 +37,21 @@ A full database backup is saved to `storage/backups/` first. Then the tables and
 ## Command line
 
 `php seed_database.php` loads demo data. It resets demo account passwords, so never run it on a live shop.
+
+## Scheduled job (reminders and clean-up)
+
+Add one daily cron entry in your hosting panel:
+
+    0 8 * * * php /home/USER/public_html/cron/run.php
+
+Turn reminders on under Settings → Reminders. The job records every reminder it sends, so running it more than once a day never sends duplicates.
+
+## Email and SMS
+
+Settings → Email and Settings → SMS. Each has a test button. SMS supports Africa's Talking, EgoSMS, or any provider that accepts a send link.
+
+## Tests
+
+    BM_TEST_DB_USER=user BM_TEST_DB_PASS=pass php tests/run.php
+
+Uses a scratch database (`bm_selftest`) that it creates and drops.

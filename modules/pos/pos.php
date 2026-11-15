@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/bootstrap.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/rbac.php';
 require_once __DIR__ . '/../../includes/helpers.php';
+require_once __DIR__ . '/../../includes/tax.php';
 
 require_permission('pos.create');
 
@@ -244,6 +245,10 @@ require_once __DIR__ . '/../../templates/layout/header.php';
         <span class="muted">Discount</span>
         <span class="fw-semibold" id="t_discount">0</span>
       </div>
+      <div class="pos-row d-none" id="t_tax_row">
+        <span class="muted" id="t_tax_label">Tax</span>
+        <span class="fw-semibold" id="t_tax">0</span>
+      </div>
       <div class="pos-divider"></div>
       <div class="pos-row">
         <span class="muted">Grand Total</span>
@@ -329,7 +334,8 @@ require_once __DIR__ . '/../../templates/layout/header.php';
       discount: <?= $can_discount ? 'true' : 'false' ?>,
       editPrice: <?= $can_editprice ? 'true' : 'false' ?>,
       debt: <?= $can_debt ? 'true' : 'false' ?>
-    }
+    },
+    tax: <?= json_encode(tax_config()) ?>
   };
 </script>
 

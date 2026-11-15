@@ -163,10 +163,18 @@
       discountTotal += num(it.discount);
     });
 
-    const grand = Math.max(0, subtotalUGX - discountTotal);
+    // Mirrors includes/tax.php; the server recomputes and is the authority
+    const net = Math.max(0, subtotalUGX - discountTotal);
+    const taxCfg = (window.POS_CONFIG && window.POS_CONFIG.tax) || { enabled: false };
+    let tax = 0, grand = net;
+    if (taxCfg.enabled && taxCfg.rate > 0 && net > 0) {
+      const r = taxCfg.rate / 100;
+      if (taxCfg.inclusive) tax = Math.round((net - net / (1 + r)) * 100) / 100;
+      else { tax = Math.round(net * r * 100) / 100; grand = Math.round((net + tax) * 100) / 100; }
+    }
     const paid = payments.reduce((sum, p) => sum + num(p.amount), 0);
     const balance = grand - paid;
-    return { subtotal: subtotalUGX, discount: discountTotal, grand, paid, balance };
+    return { subtotal: subtotalUGX, discount: discountTotal, tax, taxCfg, grand, paid, balance };
   }
 
   function renderTotals() {
@@ -174,6 +182,12 @@
     if (elTSubtotal) elTSubtotal.textContent = fmt(t.subtotal);
     if (elTDiscount) elTDiscount.textContent = fmt(t.discount);
     if (elTGrand) elTGrand.textContent = fmt(t.grand);
+    const taxRow = document.getElementById("t_tax_row");
+    if (taxRow) {
+      taxRow.classList.toggle("d-none", !t.taxCfg.enabled);
+      document.getElementById("t_tax_label").textContent = (t.taxCfg.name || "Tax") + " " + (t.taxCfg.rate || 0) + "%" + (t.taxCfg.inclusive ? " (included)" : "");
+      document.getElementById("t_tax").textContent = fmt(t.tax);
+    }
     if (elTBalanceDisplay) elTBalanceDisplay.textContent = `Balance: ${fmt(t.balance)}`;
     if (elCartCount) elCartCount.textContent = `${cart.length} item${cart.length === 1 ? '' : 's'}`;
 
@@ -404,6 +418,9 @@
           });
           elResults.appendChild(item);
         });
+        // A scanned barcode (or a typed SKU) that matches exactly one product goes straight into the cart
+        const exact = data.results.filter(p => p.exact);
+        if (exact.length === 1 && elResults.firstElementChild) { elResults.firstElementChild.click(); return; }
       }
       showResults();
     } catch (e) {

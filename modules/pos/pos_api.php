@@ -7,6 +7,9 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/rbac.php';
 require_once __DIR__ . '/../../includes/helpers.php';
 require_once __DIR__ . '/../../includes/audit.php';
+require_once __DIR__ . '/../../includes/tax.php';
+require_once __DIR__ . '/../../includes/docnum.php';
+require_once __DIR__ . '/../../includes/shifts.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -183,7 +186,7 @@ if ($action === 'search_products') {
 
   $sql = "
     SELECT 
-      p.id, p.sku, p.name, 
+      p.id, p.sku, p.barcode, p.name, 
       p.images AS thumbnail,
       p.retail_price, p.wholesale_price,
       COALESCE(s.qty_base,0) AS stock_qty
@@ -191,15 +194,15 @@ if ($action === 'search_products') {
     LEFT JOIN stock_by_location s 
       ON s.product_id = p.id AND s.location_id = ?
     WHERE p.is_active = 1
-      AND (p.sku LIKE ? OR p.name LIKE ?)
-    ORDER BY p.name ASC
+      AND (p.sku LIKE ? OR p.name LIKE ? OR p.barcode = ?)
+    ORDER BY (p.barcode = ?) DESC, (p.sku = ?) DESC, p.name ASC
     LIMIT 20
   ";
 
   $st = $db->prepare($sql);
-  if (!$st) out(['ok'=>false,'error'=>$db->error], 500);
+  if (!$st) pos_fail($db, 'search');
 
-  $st->bind_param('iss', $location_id, $like, $like);
+  $st->bind_param('isssss', $location_id, $like, $like, $q, $q, $q);
   $st->execute();
   $rs = $st->get_result();
 
@@ -209,10 +212,11 @@ if ($action === 'search_products') {
       'id' => (int)$r['id'],
       'sku' => (string)$r['sku'],
       'name' => (string)$r['name'],
+      'exact' => ($r['barcode'] !== null && $r['barcode'] === $q) || strcasecmp((string)$r['sku'], $q) === 0,
       'thumbnail' => $r['thumbnail'],
       'retail_price' => (float)$r['retail_price'],
       'wholesale_price' => (float)$r['wholesale_price'],
-      'stock_display' => 'Stock: ' . (string)$r['stock_qty'],
+      'stock_display' => 'Stock: ' . rtrim(rtrim(number_format((float)$r['stock_qty'], 3, '.', ''), '0'), '.'),
       'tag' => ''
     ];
   }
@@ -441,6 +445,18 @@ if ($action === 'confirm_sale') {
   }
   $grand_total = round($grand_total + $b2b_subtotal, 2);
 
+  // Tax on the discounted total (settings decide the rate and whether prices already include it)
+  $taxed = tax_compute($grand_total);
+  $tax_total = $taxed['tax'];
+  $grand_total = $taxed['total'];
+
+  // Shift: link the sale to the cashier's open shift; required when the setting says so
+  $shift = shift_current($db, $uid);
+  if (!$shift && setting_bool('shift_required') && !is_super_admin()) {
+    out(['ok'=>false,'error'=>'Open a shift before selling (Sales → Shifts & cash-up).'], 409);
+  }
+  $shift_id = $shift ? (int)$shift['id'] : null;
+
   // payments: only known methods; anything tendered above the total is change, not income
   $allowedMethods = ['cash', 'mobile_money', 'bank'];
   $tendered = 0.0;
@@ -470,6 +486,25 @@ if ($action === 'confirm_sale') {
   if ($grand_total > 0 && $balance <= 0) $payment_status = 'paid';
   else if ($amount_paid > 0) $payment_status = 'partial';
 
+  // Selling on credit: needs a named customer, the permission, and room under their limit
+  if ($balance > 0.005 && $doc_type === 'receipt') {
+    if (!has_perm_local('pos.allow_debt') && !is_super_admin()) out(['ok'=>false,'error'=>'This sale is not fully paid. Collect the full amount or ask a supervisor.'], 400);
+    if ($customer_id === null) out(['ok'=>false,'error'=>'Choose a customer to sell on credit.'], 400);
+  }
+  if ($balance > 0.005 && $customer_id !== null && setting_bool('credit_limit_enforced')) {
+    $stC = $db->prepare("SELECT c.name, c.credit_limit,
+                                (SELECT COALESCE(SUM(balance),0) FROM sales WHERE customer_id = c.id AND status <> 'voided') AS owed
+                         FROM customers c WHERE c.id = ? LIMIT 1");
+    $stC->bind_param('i', $customer_id);
+    $stC->execute();
+    $cust = $stC->get_result()->fetch_assoc();
+    $stC->close();
+    if ($cust && (float)$cust['credit_limit'] > 0 && (float)$cust['owed'] + $balance > (float)$cust['credit_limit'] + 0.005) {
+      $room = max(0, (float)$cust['credit_limit'] - (float)$cust['owed']);
+      out(['ok'=>false,'error'=>$cust['name'] . ' is at their credit limit. They can take ' . number_format($room) . ' more on credit.'], 409);
+    }
+  }
+
   $mv_user_col = first_existing_col($db, 'stock_movements', ['created_by', 'user_id']) ?: 'created_by';
   $pay_user_col = first_existing_col($db, 'sale_payments', ['received_by', 'created_by', 'user_id']);
 
@@ -496,41 +531,26 @@ if ($action === 'confirm_sale') {
     $stLock->close();
 
     // 2) Next document number from the per-year sequence (gapless inside this transaction)
-    $year = (int)date('Y');
-    $defaultPrefix = ['receipt'=>'RC', 'invoice'=>'INV', 'delivery_note'=>'DN'][$doc_type];
-    $stSeq = $db->prepare("INSERT INTO doc_sequences (doc_type, year, prefix, current_no) VALUES (?,?,?,LAST_INSERT_ID(1))
-                           ON DUPLICATE KEY UPDATE current_no = LAST_INSERT_ID(current_no + 1)");
-    if (!$stSeq) throw new Exception('Prepare sequence failed: ' . $db->error);
-    $stSeq->bind_param('sis', $doc_type, $year, $defaultPrefix);
-    if (!$stSeq->execute()) throw new Exception('Sequence failed: ' . $stSeq->error);
-    $stSeq->close();
-    $seqNo = (int)$db->query("SELECT LAST_INSERT_ID()")->fetch_row()[0];
-    $stPre = $db->prepare("SELECT prefix FROM doc_sequences WHERE doc_type=? AND year=? LIMIT 1");
-    $stPre->bind_param('si', $doc_type, $year);
-    $stPre->execute();
-    $prefix = (string)($stPre->get_result()->fetch_row()[0] ?? $defaultPrefix);
-    $stPre->close();
-    $doc_no = sprintf('%s-%d-%06d', $prefix, $year, $seqNo);
+    $doc_no = doc_next_number($db, $doc_type);
 
     // 3) Sale header
     $status = 'confirmed';
     $currency = 'UGX';
-    $tax_total = 0.0;
     $has_b2b_flag = $has_b2b ? 1 : 0;
 
     $stSale = $db->prepare("INSERT INTO sales
       (doc_type, doc_no, selling_location_id, customer_id, pricing_mode,
        status, payment_status, currency,
        subtotal, discount_total, tax_total, grand_total,
-       amount_paid, balance, notes, created_by, has_b2b)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+       amount_paid, balance, notes, created_by, has_b2b, shift_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     if (!$stSale) throw new Exception('Prepare sale failed: ' . $db->error);
     $stSale->bind_param(
-      'ssiissssddddddsii',
+      'ssiissssddddddsiii',
       $doc_type, $doc_no, $location_id, $customer_id, $pricing_mode,
       $status, $payment_status, $currency,
       $subtotal, $discount_total, $tax_total, $grand_total,
-      $amount_paid, $balance, $notes, $uid, $has_b2b_flag
+      $amount_paid, $balance, $notes, $uid, $has_b2b_flag, $shift_id
     );
     if (!$stSale->execute()) throw new Exception('Insert sale failed: ' . $stSale->error);
     $sale_id = (int)$stSale->insert_id;
@@ -625,6 +645,7 @@ if ($action === 'confirm_sale') {
       'sale_id'=>$sale_id,
       'doc_no'=>$doc_no,
       'grand_total'=>$grand_total,
+      'tax_total'=>$tax_total,
       'amount_paid'=>$amount_paid,
       'balance'=>$balance,
       'change_due'=>$change_due,
