@@ -2,10 +2,10 @@ package ug.almatech.businessmanager
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
@@ -26,10 +26,11 @@ import java.util.concurrent.Executors
  * keeping one open, but it survives the printer being switched off between
  * customers, which is how they are actually used.
  */
-class BluetoothPrinterPlugin(private val context: Context) : MethodChannel.MethodCallHandler {
+class BluetoothPrinterPlugin(private val activity: Activity) : MethodChannel.MethodCallHandler {
 
     companion object {
         const val CHANNEL = "ug.almatech.businessmanager/printer"
+        private const val REQUEST_BLUETOOTH = 4201
         /** The well-known serial port profile id every one of these printers uses. */
         private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
         private const val CONNECT_TIMEOUT_MS = 8000L
@@ -37,10 +38,11 @@ class BluetoothPrinterPlugin(private val context: Context) : MethodChannel.Metho
 
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
+    private var pendingPairedResult: MethodChannel.Result? = null
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "paired" -> onWorker(result) { paired() }
+            "paired" -> pairedWithPermission(result)
             "print" -> {
                 val address = call.argument<String>("address")
                 val bytes = call.argument<ByteArray>("bytes")
@@ -52,6 +54,37 @@ class BluetoothPrinterPlugin(private val context: Context) : MethodChannel.Metho
             }
             else -> result.notImplemented()
         }
+    }
+
+    private fun pairedWithPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !hasBluetoothPermission()) {
+            if (pendingPairedResult != null) {
+                result.error("no_permission", "Allow the app to use Bluetooth.", null)
+                return
+            }
+            pendingPairedResult = result
+            activity.requestPermissions(
+                arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT),
+                REQUEST_BLUETOOTH
+            )
+            return
+        }
+        onWorker(result) { paired() }
+    }
+
+    /** Called by MainActivity after Android finishes the Nearby devices prompt. */
+    fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
+        if (requestCode != REQUEST_BLUETOOTH) return false
+        val result = pendingPairedResult
+        pendingPairedResult = null
+        if (result == null) return true
+
+        if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+            onWorker(result) { paired() }
+        } else {
+            result.error("no_permission", "Allow the app to use Bluetooth to see paired printers.", null)
+        }
+        return true
     }
 
     /** Bluetooth work must never run on the UI thread: a stalled printer would freeze the till. */
@@ -71,16 +104,24 @@ class BluetoothPrinterPlugin(private val context: Context) : MethodChannel.Metho
     private class PrinterError(val code: String, override val message: String) : Exception(message)
 
     private fun adapter(): BluetoothAdapter {
-        val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+        val manager = activity.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
         val adapter = manager?.adapter ?: throw PrinterError("no_bluetooth", "This phone has no Bluetooth.")
         if (!adapter.isEnabled) throw PrinterError("bluetooth_off", "Bluetooth is switched off.")
         return adapter
     }
 
+    private fun hasBluetoothPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        return ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_SCAN) ==
+                PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_CONNECT) ==
+                PackageManager.PERMISSION_GRANTED
+    }
+
     /** Android 12 and newer ask for BLUETOOTH_CONNECT at runtime; older versions grant it at install. */
     private fun requirePermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+        val granted = ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_CONNECT) ==
             PackageManager.PERMISSION_GRANTED
         if (!granted) throw PrinterError("no_permission", "Allow the app to use Bluetooth.")
     }
