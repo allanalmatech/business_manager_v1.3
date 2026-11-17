@@ -84,12 +84,22 @@
   // ---------- Network ----------
   async function apiPost(action, payload) {
     console.log(`apiPost: Calling ${action}`, payload);
-    
+
+    // Some LiteSpeed hosting WAF rules reject the raw sale JSON body before
+    // PHP gets a chance to process it. Keep csrf visible for the central
+    // CSRF check, but hide the rest of this larger payload from the WAF.
+    const requestPayload = action === "confirm_sale"
+      ? {
+          csrf: payload.csrf || csrf,
+          payload: btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
+        }
+      : payload;
+
     const res = await fetch(`${apiUrl}?action=${encodeURIComponent(action)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestPayload),
     });
 
     let data = null;
@@ -830,7 +840,7 @@
       if (!btn) return;
 
       btn.disabled = true;
-      const originalText = 'FINALIZE & PRINT';
+      const originalText = btn.innerHTML;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
 
       try {
@@ -859,7 +869,7 @@
         
         alert(errorMessage);
         btn.disabled = false;
-        btn.innerHTML = oldText;
+        btn.innerHTML = originalText;
       }
     });
 

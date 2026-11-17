@@ -459,7 +459,7 @@ require_once __DIR__ . '/../../templates/layout/header.php';
   </div>
 </div>
 
-<script src="<?= h($BASE_URL) ?>/assets/js/pos.js?v=3"></script>
+<script src="<?= h($BASE_URL) ?>/assets/js/pos.js?v=4"></script>
 
     </main>
   </div>
