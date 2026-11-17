@@ -36,8 +36,29 @@ function sync_shape(string $entity, array $row): array
         elseif (in_array($k, $nums, true)) $row[$k] = (float)$v;
     }
     if ($entity === 'product') {
-        $imgs = json_decode((string)($row['images'] ?? '[]'), true);
-        $row['image'] = (is_array($imgs) && $imgs) ? (string)reset($imgs) : null;
+        $rawImages = trim((string)($row['images'] ?? ''));
+        $imgs = json_decode($rawImages, true);
+        $image = null;
+        if (is_array($imgs)) {
+            foreach ($imgs as $img) {
+                if (is_string($img) && trim($img) !== '') {
+                    $image = trim($img);
+                    break;
+                }
+                if (is_array($img)) {
+                    foreach (['path', 'url', 'src', 'file'] as $key) {
+                        if (isset($img[$key]) && is_string($img[$key]) && trim($img[$key]) !== '') {
+                            $image = trim($img[$key]);
+                            break 2;
+                        }
+                    }
+                }
+            }
+        } elseif ($rawImages !== '' && $rawImages !== '[]' && $rawImages !== 'null') {
+            // Older product rows stored one path directly instead of JSON.
+            $image = $rawImages;
+        }
+        $row['image'] = $image;
         unset($row['images']);
     }
     if ($entity === 'stock') $row['key'] = $row['product_id'] . ':' . $row['location_id'];
